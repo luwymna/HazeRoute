@@ -6,7 +6,7 @@ import time
 import requests
 from requests.exceptions import ConnectionError, Timeout
 
-MAX_ROUTES = 5  # cap for display
+MAX_ROUTES = 3  # cap for display
 
 MODE_PROFILES = {
     "drive": "driving-car",
@@ -31,7 +31,7 @@ def _get_api_key():
 
 
 def _call_ors(coords, profile="driving-car", alternatives=True):
-    url = f"https://api.openrouteservice.org/v2/directions/{profile}/geojson"
+    url = f"https://api.heigit.org/v2/directions/{profile}/geojson"
     raw_key = (os.getenv("ORS_API_KEY") or "").strip()
     key = _get_api_key()
 

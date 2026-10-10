@@ -476,7 +476,7 @@ body {
    ============================================================ */
 .route-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(265px, 1fr));
   gap: 12px;
 }
 
@@ -1148,24 +1148,25 @@ body {
 
 .card-exposure {
   margin: 10px 0 8px;
-  padding: 8px 10px;
+  padding: 6px 9px;
   background: var(--surface-2);
   border-radius: var(--r-sm);
   font-size: 12px;
 }
 
 .exp-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 10px;
+  display: flex;
   align-items: baseline;
-  padding: 3px 0;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2.5px 0;
+  white-space: nowrap;
 }
 
 .exp-row-fc {
   border-top: 1px dashed var(--rule-soft);
   margin-top: 3px;
-  padding-top: 6px;
+  padding-top: 5px;
   color: var(--ink-2);
 }
 
@@ -1173,21 +1174,29 @@ body {
   font-size: 11px;
   color: var(--ink-4);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .exp-pm {
   font-size: 11px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  flex-grow: 1;
+  padding: 0 4px;
 }
 
 .exp-val {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
-  min-width: 32px;
+  min-width: 44px;
   text-align: right;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .exp-row-fc .exp-val {

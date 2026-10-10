@@ -218,9 +218,9 @@ function renderCards() {
         </div>
         ${r.forecast_exposure != null ? `
           <div class="exp-row exp-row-fc">
-            <span class="exp-label">At arrival</span>
-            <span class="exp-pm">PM2.5 ${r.forecast_pm25.toFixed(1)}${r.forecast_margin != null ? ` <span class="pm-margin">± ${r.forecast_margin.toFixed(1)}</span>` : ''}</span>
-            <span class="exp-val">${r.forecast_exposure.toFixed(0)}${r.forecast_exposure_margin != null ? ` <span class="val-margin">± ${r.forecast_exposure_margin.toFixed(0)}</span>` : ''}</span>
+            <span class="exp-label">Arrival</span>
+            <span class="exp-pm">PM2.5 ${r.forecast_pm25.toFixed(1)}${r.forecast_margin != null ? `<span class="pm-margin">±${r.forecast_margin.toFixed(1)}</span>` : ''}</span>
+            <span class="exp-val">${r.forecast_exposure.toFixed(0)}${r.forecast_exposure_margin != null ? `<span class="val-margin">±${r.forecast_exposure_margin.toFixed(0)}</span>` : ''}</span>
           </div>
         `: ''}
       </div>
