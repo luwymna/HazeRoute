@@ -31,7 +31,7 @@ def _get_api_key():
 
 
 def _call_ors(coords, profile="driving-car", alternatives=True):
-    url = f"https://api.heigit.org/v2/directions/{profile}/geojson"
+    url = f"https://api.heigit.org/openrouteservice/v2/directions/{profile}/geojson"
     raw_key = (os.getenv("ORS_API_KEY") or "").strip()
     key = _get_api_key()
 
