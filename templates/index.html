@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>HazeRoute — Cleaner Route Planner</title>
+  <meta name="description" content="Compare routes by estimated pollution exposure.">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+  <!-- ============================================================
+     Header — frosted glass, sticky
+     ============================================================ -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <h1>HazeRoute</h1>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+     Control bar — horizontal, above map
+     ============================================================ -->
+  <section class="control-bar-wrap">
+    <div class="control-bar">
+
+      <!-- Start / swap / destination -->
+      <div class="route-inputs">
+        <div class="input-wrap">
+          <span class="input-dot input-dot-start" aria-hidden="true"></span>
+          <input id="start" type="text" autocomplete="off" placeholder="Start — place or coordinates"
+            aria-label="Start location">
+        </div>
+
+        <button type="button" id="swapBtn" class="swap-btn" title="Swap start and destination" aria-label="Swap">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+            <path d="M5 3 L5 15 M5 15 L2 12 M5 15 L8 12 M15 17 L15 5 M15 5 L12 8 M15 5 L18 8" fill="none"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+
+        <div class="input-wrap">
+          <span class="input-dot input-dot-end" aria-hidden="true"></span>
+          <input id="end" type="text" autocomplete="off" placeholder="Destination — place or coordinates"
+            aria-label="Destination">
+        </div>
+      </div>
+
+      <!-- Travel mode icon buttons -->
+      <div class="mode-group" role="radiogroup" aria-label="Travel mode">
+        <button type="button" class="mode-btn active" data-mode="drive" aria-label="Driving" title="Driving">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path d="M5 11 L6.5 6.2 A2 2 0 0 1 8.4 4.8 H15.6 A2 2 0 0 1 17.5 6.2 L19 11
+                   M5 11 H19 M5 11 V17 A1 1 0 0 0 6 18 H7 A1 1 0 0 0 8 17 V16 H16 V17
+                   A1 1 0 0 0 17 18 H18 A1 1 0 0 0 19 17 V11" fill="none" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="7.5" cy="13.5" r="1.2" fill="currentColor" />
+            <circle cx="16.5" cy="13.5" r="1.2" fill="currentColor" />
+          </svg>
+        </button>
+
+        <button type="button" class="mode-btn" data-mode="bike" aria-label="Cycling" title="Cycling">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <circle cx="5.5" cy="17" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <circle cx="18.5" cy="17" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M5.5 17 L10 8 L14 8 M10 8 L14.5 17 M18.5 17 L15.5 8 M13 5.5 H16.5" fill="none"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="10" cy="5" r="1.4" fill="none" stroke="currentColor" stroke-width="1.6" />
+          </svg>
+        </button>
+
+        <button type="button" class="mode-btn" data-mode="walk" aria-label="Walking" title="Walking">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <circle cx="12.5" cy="4.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M12 8 L10.5 12 L13 14 L12 20 M10.5 12 L8 15 L6 20 M13 14 L16 15 L17 20 M10 9 L7 9 M13 9 L16 10"
+              fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button type="button" id="locateBtn" class="btn-ghost" title="Use my current location"
+          aria-label="Use my location">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M12 2 V5 M12 19 V22 M2 12 H5 M19 12 H22" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" />
+            <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.35" />
+          </svg>
+        </button>
+
+        <button type="button" id="compareBtn" class="btn-primary">
+          <span class="btn-text">Compare routes</span>
+          <span class="spinner" hidden></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="profile-row">
+      <span class="profile-label">I am a</span>
+      <div class="profile-group" role="radiogroup">
+        <button type="button" class="profile-btn active" data-profile="adult">Adult</button>
+        <button type="button" class="profile-btn" data-profile="child">Child</button>
+        <button type="button" class="profile-btn" data-profile="elderly">Elderly</button>
+        <button type="button" class="profile-btn" data-profile="asthma">Asthma</button>
+        <button type="button" class="profile-btn" data-profile="pregnant">Pregnant</button>
+      </div>
+    </div>
+
+    <!-- Sample chips row -->
+    <div class="samples-bar">
+      <span class="samples-label">Or try a sample</span>
+      <button class="chip" data-start="Trafalgar Square, London" data-end="Shoreditch, London">London</button>
+      <button class="chip" data-start="KLCC, Kuala Lumpur" data-end="Mid Valley, Kuala Lumpur">Kuala Lumpur</button>
+      <button class="chip" data-start="Times Square, New York" data-end="Brooklyn Bridge, New York">New York</button>
+    </div>
+  </section>
+
+  <!-- ============================================================
+     Two-column layout: air panel (left) + map (right)
+     ============================================================ -->
+  <section class="main-split">
+    <!-- Left column: Malaysia air quality -->
+    <aside class="my-air-wrap">
+      <div class="my-air-panel">
+        <div class="my-air-header">
+          <div>
+            <h2>Malaysia air quality</h2>
+            <p class="my-air-sub">Top 10 by PM2.5 concentration · not official IPU</p>
+          </div>
+          <button id="refreshAirBtn" class="btn-ghost-sm" title="Refresh">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path d="M20 11 A8 8 0 1 0 18.5 16" fill="none" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" />
+              <path d="M20 6 V11 H15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Source disclaimer -->
+        <div class="source-note">
+          <div class="source-note-icon" aria-hidden="true">i</div>
+          <div class="source-note-text">
+            <b>Not the official API/IPU.</b>
+            Values are OpenWeather PM2.5-derived estimates at city-grid level. They often read
+            <b>lower</b> than official readings, especially during haze.
+            For official numbers, visit
+            <a href="https://apims.doe.gov.my" target="_blank" rel="noopener">apims.doe.gov.my</a>.
+          </div>
+        </div>
+
+        <ol id="myAirList" class="my-air-list">
+          <li class="my-air-loading">Loading air quality data…</li>
+        </ol>
+
+        <details class="safety-note">
+          <summary>Health &amp; safety reminders</summary>
+          <div class="safety-content">
+
+            <div class="safety-callout">
+              <b>Always check the official IPU first:</b>
+              <a href="https://apims.doe.gov.my" target="_blank" rel="noopener">apims.doe.gov.my</a>
+              — during haze season this panel may underestimate risk.
+            </div>
+
+            <p class="safety-subhead">What API/IPU levels mean (official Malaysian scale):</p>
+            <ul>
+              <li><b>0–50 (Good):</b> Safe for all outdoor activities.</li>
+              <li><b>51–100 (Moderate):</b> Sensitive groups should watch for symptoms.</li>
+              <li><b>101–200 (Unhealthy):</b> Limit outdoor exertion. Wear an N95 mask if outside. Close windows.</li>
+              <li><b>201–300 (Very Unhealthy):</b> Stay indoors. Avoid outdoor exercise. Use an air purifier if
+                available.</li>
+              <li><b>301+ (Hazardous):</b> Emergency conditions. Remain indoors with windows sealed. Seek medical help
+                for breathing difficulty.</li>
+            </ul>
+
+            <p class="safety-subhead">General precautions:</p>
+            <ul>
+              <li>Drink water frequently — helps your body cope with airborne particles.</li>
+              <li>Keep windows and doors closed when API is above 100.</li>
+              <li>Wear a fitted N95 or KN95 mask outdoors (surgical masks don't filter PM2.5).</li>
+              <li>Avoid outdoor exercise when API is above 100; move workouts indoors.</li>
+              <li>Use an air purifier with a HEPA filter indoors if you have one.</li>
+              <li>Children, the elderly, pregnant women, and those with asthma or heart conditions are at higher risk —
+                take extra care.</li>
+              <li>Seek medical help if you experience chest pain, severe shortness of breath, or persistent coughing.
+              </li>
+            </ul>
+
+            <p class="safety-meta">
+              Health thresholds follow the Department of Environment (DOE) Malaysia IPU scale.
+              Official readings and advisories: <b>apims.doe.gov.my</b>
+            </p>
+          </div>
+        </details>
+      </div>
+    </aside>
+
+    <!-- Right column: map -->
+    <section class="map-wrap">
+      <div id="map"></div>
+      <div id="legend" class="legend" hidden>
+        <div><span class="dot dot-winner"></span>Lower exposure</div>
+        <div><span class="dot dot-loser"></span>Higher exposure</div>
+      </div>
+    </section>
+
+  </section>
+
+  <!-- ============================================================
+     Result strip — verdict + route cards below the map
+     ============================================================ -->
+  <section class="results-wrap">
+
+    <p class="banner">
+      <strong>Estimates only.</strong> Pollution data is city-level and hourly.
+      Travel times use speed limits, not live traffic. Not medical advice.
+    </p>
+
+    <div id="error" class="error" hidden></div>
+
+    <div id="verdict" class="verdict" hidden></div>
+
+    <div id="routeCards" class="route-cards"></div>
+
+  </section>
+
+  <!-- ============================================================
+     Footer
+     ============================================================ -->
+  <footer class="footer">
+    Data from OpenRouteService, OpenWeather, and OpenStreetMap.<br>
+    Exposure estimate: PM2.5 (µg/m³) × travel time (min) × breathing factor.
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+</body>
+
+</html>
