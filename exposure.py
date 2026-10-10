@@ -62,6 +62,7 @@ def compare_all_routes(routes, profile="adult"):
             "winner": None,
             "message": "Not enough pollution data to compare routes.",
             "confidence": "none",
+            "urgency": "low",
             "profile": profile,
             "using_forecast": False,
         }
@@ -78,6 +79,7 @@ def compare_all_routes(routes, profile="adult"):
             "winner": None,
             "message": "Air quality is clean on all routes — comparable exposure.",
             "confidence": "low",
+            "urgency": "low",
             "profile": profile,
             "using_forecast": using_forecast,
             "all_scores": {r["name"]: r["_compare_value"] for r in scored},
@@ -91,6 +93,7 @@ def compare_all_routes(routes, profile="adult"):
             "winner": None,
             "message": f"All {len(scored)} routes have comparable estimated exposure.",
             "confidence": "low",
+            "urgency": "low",
             "diff_pct": round(diff * 100, 1),
             "profile": profile,
             "using_forecast": using_forecast,
@@ -143,11 +146,22 @@ def compare_all_routes(routes, profile="adult"):
             f"exposure — about {saving_pct}% lower than Route {worst['name']}."
         )
 
+    # Classify urgency based on effective exposure vs profile-adjusted threshold
+    if effective_exposure >= 600:
+        urgency = "critical"
+    elif effective_exposure >= 400:
+        urgency = "high"
+    elif effective_exposure >= 200:
+        urgency = "medium"
+    else:
+        urgency = "low"
+
     return {
         "winner": best["name"],
         "co2_winner": lowest_co2["name"] if lowest_co2 else None,
         "same_winner": bool(same_as_best),
         "message": message,
+        "urgency": urgency,
         "confidence": "moderate" if diff > 0.25 else "low",
         "diff_pct": saving_pct,
         "best": best["name"],

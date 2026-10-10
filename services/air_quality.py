@@ -125,3 +125,63 @@ def sample_route_forecast(coords, arrival_ts, n=5):
     if not values:
         return None
     return sum(values) / len(values)
+
+def get_forecast_with_variance(lat, lon, target_ts):
+    """
+    Returns (pm25_estimate, margin) where margin is a rough ± bound.
+    Uses the spread across the next 3 forecast hours as a proxy for uncertainty.
+    """
+    fc = get_forecast(lat, lon)
+    if not fc:
+        return None, None
+
+    # Find the closest forecast hour
+    closest_idx = min(range(len(fc)), key=lambda i: abs(fc[i]["timestamp"] - target_ts))
+
+    # Take a window of ±1 hour (3 points) for variance
+    lo = max(0, closest_idx - 1)
+    hi = min(len(fc), closest_idx + 2)
+    window = [fc[i]["pm2_5"] for i in range(lo, hi)]
+
+    if not window:
+        return None, None
+
+    mean = sum(window) / len(window)
+    if len(window) > 1:
+        var = sum((v - mean) ** 2 for v in window) / (len(window) - 1)
+        std = var ** 0.5
+    else:
+        std = 0
+
+    return mean, std
+
+
+def sample_route_forecast_with_margin(coords, arrival_ts, n=5):
+    """
+    Average forecast PM2.5 across route points, plus an aggregate margin.
+    """
+    if not coords:
+        return None, None
+    if len(coords) < 2:
+        return get_forecast_with_variance(coords[0][1], coords[0][0], arrival_ts)
+
+    if len(coords) <= n:
+        samples = coords
+    else:
+        indices = [round(i * (len(coords) - 1) / (n - 1)) for i in range(n)]
+        samples = [coords[i] for i in indices]
+
+    means, stds = [], []
+    for lon, lat in samples:
+        m, s = get_forecast_with_variance(lat, lon, arrival_ts)
+        if m is not None:
+            means.append(m)
+            stds.append(s or 0)
+
+    if not means:
+        return None, None
+
+    avg_mean = sum(means) / len(means)
+    # Aggregate error: average of per-point stds, scaled by 1/sqrt(n) for averaging
+    avg_std = (sum(stds) / len(stds)) / (len(stds) ** 0.5)
+    return avg_mean, avg_std

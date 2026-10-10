@@ -1193,3 +1193,43 @@ body {
 .exp-row-fc .exp-val {
   color: var(--blue);
 }
+
+.verdict.urgency-medium {
+  border-color: rgba(179, 123, 40, 0.4);
+  background: linear-gradient(180deg, #fffdf3 0%, #fff7e0 100%);
+}
+
+.verdict.urgency-high {
+  border-color: rgba(168, 71, 44, 0.5);
+  background: linear-gradient(180deg, #fdf1ee 0%, #fbe4dd 100%);
+  color: #6b2a1a;
+  font-weight: 600;
+}
+
+.verdict.urgency-critical {
+  border-color: var(--red);
+  background: linear-gradient(180deg, #fbe0dc 0%, #f8c8bf 100%);
+  color: #5a1a0e;
+  font-weight: 600;
+  animation: pulse-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 71, 44, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(168, 71, 44, 0);
+  }
+}
+
+.pm-margin,
+.val-margin {
+  font-size: 10px;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-left: 2px;
+}

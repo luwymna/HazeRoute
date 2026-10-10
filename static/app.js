@@ -223,10 +223,10 @@ function renderCards() {
           <span class="exp-val">${r.exposure != null ? r.exposure.toFixed(0) : "-"}</span>
         </div>
         ${r.forecast_exposure != null ? `
-          <div class="exp-row">
+          <div class="exp-row exp-row-fc">
             <span class="exp-label">At arrival</span>
-            <span class="exp-pm">PM2.5 ${r.forecast_pm25.toFixed(1)}</span>
-            <span class="exp-val">${r.forecast_exposure.toFixed(0)}</span>
+            <span class="exp-pm">PM2.5 ${r.forecast_pm25.toFixed(1)}${r.forecast_margin != null ? ` <span class="pm-margin">± ${r.forecast_margin.toFixed(1)}</span>` : ''}</span>
+            <span class="exp-val">${r.forecast_exposure.toFixed(0)}${r.forecast_exposure_margin != null ? ` <span class="val-margin">± ${r.forecast_exposure_margin.toFixed(0)}</span>` : ''}</span>
           </div>
         `: ''}
       </div>
@@ -249,10 +249,18 @@ function renderCards() {
 function renderVerdict() {
   if (!currentData) return;
   const { verdict } = currentData;
-
   verdictBox.hidden = false;
-  verdictBox.className = 'verdict ' + (verdict.winner ? 'winner' : 'tie');
-  verdictBox.textContent = verdict.message;
+
+  const urgency = verdict.urgency || "low";
+  const urgencyIcon = {
+    low: "",
+    medium: "⚠️ ",
+    high: "⚠️ ",
+    critical: "🚨 ",
+  }[urgency] || "";
+
+  verdictBox.className = `verdict ${verdict.winner ? 'winner' : 'tie'} urgency-${urgency}`;
+  verdictBox.textContent = urgencyIcon + verdict.message;
 }
 
 // ============================================================
@@ -285,7 +293,13 @@ async function compare() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ start, end, mode, profile }),
     });
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      showError(`Server error (${res.status}). Please check Flask logs.`);
+      return;
+    }
 
     if (!res.ok) {
       showError(data.error || 'Something went wrong.');

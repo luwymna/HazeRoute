@@ -4,7 +4,11 @@ from dotenv import load_dotenv
 
 from services.geocode import geocode
 from services.routing import get_routes
-from services.air_quality import sample_route, sample_route_forecast, get_pollution
+from services.air_quality import (
+    sample_route,
+    sample_route_forecast_with_margin,
+    get_pollution,
+)
 from exposure import exposure_score, compare_all_routes, apply_sensitivity
 
 load_dotenv()
@@ -13,6 +17,7 @@ app = Flask(__name__)
 # kg CO2 per km — fuel-burned only
 CARBON_FACTORS = {
     "drive":  0.162,
+    "bike":   0.016,
     "cycle":  0.016,
     "walk":   0.0,
 }
@@ -94,11 +99,15 @@ def compare():
 
         # --- Forecast pollution at arrival ---
         arrival_ts = departure_ts + int(r["duration_s"])
-        forecast_pm25 = sample_route_forecast(r["coords"], arrival_ts)
+        forecast_pm25, forecast_margin = sample_route_forecast_with_margin(r["coords"], arrival_ts)
         forecast_exposure = None
+        forecast_exposure_margin = None
         if forecast_pm25 is not None:
             forecast_exposure = forecast_pm25 * (r["duration_s"] / 60) * mode_factor
             forecast_exposure = apply_sensitivity(forecast_exposure, profile)
+            if forecast_margin is not None:
+                forecast_exposure_margin = forecast_margin * (r["duration_s"] / 60) * mode_factor
+                forecast_exposure_margin = apply_sensitivity(forecast_exposure_margin, profile)
 
         # --- Carbon (independent of pollution) ---
         co2_kg = (r["distance_m"] / 1000) * carbon_factor
@@ -110,7 +119,9 @@ def compare():
             "pollution": pollution,
             "exposure": round(exposure, 1) if exposure is not None else None,
             "forecast_pm25": round(forecast_pm25, 1) if forecast_pm25 is not None else None,
+            "forecast_margin": round(forecast_margin, 1) if forecast_margin is not None else None,
             "forecast_exposure": round(forecast_exposure, 1) if forecast_exposure is not None else None,
+            "forecast_exposure_margin": round(forecast_exposure_margin, 1) if forecast_exposure_margin is not None else None,
             "arrival_ts": arrival_ts,
             "co2_kg": round(co2_kg, 2),
             "coords": r["coords"],
