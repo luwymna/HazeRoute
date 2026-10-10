@@ -217,6 +217,11 @@ function renderCards() {
         <div><b>${fmtDistance(r.distance_m)}</b> distance</div>
       </div>
       <div class="pollution-list">${pollChips}</div>
+      <div class="card-carbon">
+        <span class="carbon-label">CO₂</span>
+        <span class="carbon-value">${r.co2_kg != null ? r.co2_kg.toFixed(2) : '—'} kg</span>
+        <span class="carbon-note">fuel only</span>
+      </div>
       <div class="card-hint">${isActive ? 'Click again to show all routes' : 'Click to isolate on the map'}</div>
     `;
 
@@ -289,10 +294,10 @@ async function compare() {
 // ============================================================
 function apiCategory(api) {
   if (api == null) return { cls: "badge-moderate", label: "—" };
-  if (api <= 50)  return { cls: "badge-good",      label: "Low" };
-  if (api <= 100) return { cls: "badge-moderate",  label: "Elevated" };
+  if (api <= 50) return { cls: "badge-good", label: "Low" };
+  if (api <= 100) return { cls: "badge-moderate", label: "Elevated" };
   if (api <= 200) return { cls: "badge-unhealthy", label: "High" };
-  if (api <= 300) return { cls: "badge-very",      label: "Very High" };
+  if (api <= 300) return { cls: "badge-very", label: "Very High" };
   return { cls: "badge-hazardous", label: "Extreme" };
 }
 

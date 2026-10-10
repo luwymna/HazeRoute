@@ -2,14 +2,20 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
 
-load_dotenv()
-
 from services.geocode import geocode
 from services.routing import get_routes
 from services.air_quality import sample_route, get_pollution
 from exposure import exposure_score, compare_all_routes, apply_sensitivity
 
+load_dotenv()
 app = Flask(__name__)
+
+# kg CO2 per km — fuel-burned only
+CARBON_FACTORS = {
+    "drive":  0.162,
+    "cycle":  0.016,
+    "walk":   0.0,
+}
 
 
 # ============================================================
@@ -72,6 +78,7 @@ def compare():
         "cycle": 2.5,
         "walk": 2.0,
     }.get(mode, 1.0)
+    carbon_factor = CARBON_FACTORS.get(mode, 0.162)
 
     results = []
     for i, r in enumerate(raw_routes):
@@ -81,12 +88,15 @@ def compare():
             exposure *= mode_factor
             exposure = apply_sensitivity(exposure, profile)
 
+            co2_kg = (r["distance_m"] / 1000) * carbon_factor
+
         results.append({
             "name": chr(65 + i),  # A, B, C, D, E
             "duration_s": round(r["duration_s"]),
             "distance_m": round(r["distance_m"]),
             "pollution": pollution,
             "exposure": round(exposure, 1) if exposure is not None else None,
+            "co2_kg": round(co2_kg, 2),
             "coords": r["coords"],
             "start_name": start[2],
             "end_name": end[2],

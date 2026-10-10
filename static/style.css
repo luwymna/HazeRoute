@@ -1116,3 +1116,32 @@ body {
   background: var(--blue-hover);
   border-color: var(--blue-hover);
 }
+
+.card-carbon {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--rule-soft);
+  font-size: 12px;
+}
+
+.carbon-label {
+  font-weight: 600;
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+.carbon-value {
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.carbon-note {
+  color: var(--ink-4);
+  font-size: 11px;
+  font-style: italic;
+}

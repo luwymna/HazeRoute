@@ -87,6 +87,11 @@ def compare_all_routes(routes, profile="adult"):
             "all_scores": {r["name"]: r["exposure"] for r in scored},
         }
 
+    # Find the route with the lowest carbon cost
+    scored_with_co2 = [r for r in scored if r.get("co2_kg") is not None]
+    lowest_co2 = min(scored_with_co2, key=lambda r: r["co2_kg"]) if scored_with_co2 else None
+    same_as_best = lowest_co2 and lowest_co2["name"] == best["name"]
+
     # --- Winner exists. Tailor the message by profile. ---
     saving_pct = round(diff * 100)
     sensitivity = SENSITIVITY_FACTORS.get(profile, 1.0)
@@ -106,7 +111,23 @@ def compare_all_routes(routes, profile="adult"):
                 f"but levels are elevated — about {saving_pct}% lower "
                 f"than Route {worst['name']}."
             )
+    elif same_as_best:
+        # Best route for exposure is ALSO best for carbon
+        message = (
+            f"Route {best['name']} is best on both measures — lowest pollution "
+            f"exposure ({best['exposure']:.0f}) and lowest carbon "
+            f"({best['co2_kg']:.2f} kg CO₂)."
+        )
+    elif lowest_co2:
+        # Two different routes win on the two measures — the interesting case
+        message = (
+            f"Route {best['name']} has the lowest pollution exposure "
+            f"({best['exposure']:.0f}). "
+            f"For the lowest carbon, choose Route {lowest_co2['name']} "
+            f"({lowest_co2['co2_kg']:.2f} kg CO₂)."
+        )
     else:
+        # No carbon data available — fall back to plain exposure message
         message = (
             f"Route {best['name']} has the lowest estimated pollution exposure "
             f"— about {saving_pct}% lower than Route {worst['name']}."
@@ -114,6 +135,8 @@ def compare_all_routes(routes, profile="adult"):
 
     return {
         "winner": best["name"],
+        "co2_winner": lowest_co2["name"] if lowest_co2 else None,
+        "same_winner": bool(same_as_best),
         "message": message,
         "confidence": "moderate" if diff > 0.25 else "low",
         "diff_pct": saving_pct,
