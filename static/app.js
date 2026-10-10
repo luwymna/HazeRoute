@@ -1,9 +1,3 @@
-// ============================================================
-// HazeRoute — client-side app
-// ============================================================
-
-// ---------- Map setup ----------
-// Default: centred on peninsular Malaysia, zoom 7
 const map = L.map('map').setView([3.1390, 101.6869], 7);
 
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
