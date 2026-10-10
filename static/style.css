@@ -3,30 +3,30 @@
    ============================================================ */
 
 :root {
-  --bg: #e8e0d1;
-  --surface: #faf6ee;
-  --surface-2: #e8e0d1;
-  --ink: #2b2419;
-  --ink-2: #4f4636;
-  --ink-3: #776d5b;
-  --ink-4: #9c927f;
-  --rule: #d4c9b6;
-  --rule-soft: #e5dccb;
+  --bg: #efe3cf;
+  --surface: #fbf4e6;
+  --surface-2: #e7d8bd;
+  --ink: #2e2416;
+  --ink-2: #55472f;
+  --ink-3: #7f6c4e;
+  --ink-4: #a8977a;
+  --rule: #d9c9a8;
+  --rule-soft: #e8dcc2;
 
-  --blue: #7a4a2a;
-  --blue-hover: #663d22;
-  --blue-press: #53321b;
+  --blue: #9c4a1e;
+  --blue-hover: #833d18;
+  --blue-press: #6b3114;
 
-  --green: #5c6f3a;
-  --red: #a8472c;
-  --orange: #b37b28;
+  --green: #6b7a3a;
+  --red: #b04526;
+  --orange: #c78a2e;
 
   --r-sm: 4px;
   --r-md: 8px;
   --r-lg: 12px;
 
-  --shadow-sm: 0 1px 2px rgba(43, 36, 25, .06), 0 1px 3px rgba(43, 36, 25, .05);
-  --shadow-md: 0 2px 8px rgba(43, 36, 25, .08), 0 6px 16px rgba(43, 36, 25, .06);
+  --shadow-sm: 0 1px 2px rgba(60, 40, 20, .07), 0 1px 3px rgba(60, 40, 20, .05);
+  --shadow-md: 0 2px 8px rgba(60, 40, 20, .09), 0 6px 16px rgba(60, 40, 20, .06);
 
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
   --max-w: 1180px;
@@ -86,11 +86,11 @@ body {
 }
 
 .brand h1 {
-  font-size: 30px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  text-align: center;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  text-shadow: 0.3px 0 0 currentColor, -0.3px 0 0 currentColor;
 }
 
 .brand .tagline {
@@ -327,7 +327,7 @@ body {
   gap: 8px;
   margin-top: 12px;
   font-size: 12px;
-  color: var(--ink-4);
+  color: var(--ink-2);
 }
 
 .samples-label {
@@ -429,7 +429,7 @@ body {
 
 .banner {
   font-size: 12px;
-  color: var(--ink-4);
+  color: var(--ink-2);
   line-height: 1.55;
   padding: 0 2px;
 }
@@ -484,7 +484,7 @@ body {
   grid-column: 1 / -1;
   font-size: 11px;
   font-weight: 500;
-  color: var(--ink-4);
+  color: var(--ink-2);
   letter-spacing: 0.02em;
   text-transform: uppercase;
   padding: 0 2px;
@@ -638,7 +638,7 @@ body {
 .card-hint {
   margin-top: 10px;
   font-size: 11px;
-  color: var(--ink-4);
+  color: var(--ink-2);
 }
 
 .route-card.active .card-hint {
@@ -653,7 +653,7 @@ body {
   margin: 0 auto;
   padding: 24px 32px 60px;
   font-size: 12px;
-  color: var(--ink-4);
+  color: var(--ink-2);
   line-height: 1.6;
   border-top: 1px solid var(--rule-soft);
 }
@@ -1071,12 +1071,12 @@ body {
   margin-top: 12px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: var(--ink-4);
+  color: var(--ink-2);
 }
 
 .profile-label {
   font-size: 12px;
-  color: var(--ink-4);
+  color: var(--ink-2);
   white-space: nowrap;
 }
 
@@ -1141,7 +1141,7 @@ body {
 }
 
 .carbon-note {
-  color: var(--ink-4);
+  color: var(--ink-2);
   font-size: 11px;
   font-style: italic;
 }
@@ -1172,7 +1172,7 @@ body {
 
 .exp-label {
   font-size: 11px;
-  color: var(--ink-4);
+  color: var(--ink-2);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
@@ -1238,7 +1238,7 @@ body {
 .pm-margin,
 .val-margin {
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink);
   font-weight: 400;
   margin-left: 2px;
 }
