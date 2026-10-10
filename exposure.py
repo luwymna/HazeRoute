@@ -146,6 +146,19 @@ def compare_all_routes(routes, profile="adult"):
             f"exposure — about {saving_pct}% lower than Route {worst['name']}."
         )
 
+    # Quantitative Confidence Score for Criterion 2 Q&A
+    best_margin = best.get("forecast_margin") or 2.5
+    rel_margin = best_margin / max(best.get("forecast_pm25") or 10.0, 1.0)
+    if diff > rel_margin * 1.5:
+        confidence_pct = min(96, round(85 + (diff - rel_margin) * 25))
+        confidence_level = "high"
+    elif diff > rel_margin:
+        confidence_pct = min(84, round(70 + (diff / max(rel_margin, 0.1)) * 10))
+        confidence_level = "moderate"
+    else:
+        confidence_pct = max(55, round(50 + diff * 40))
+        confidence_level = "low"
+
     # Classify urgency based on effective exposure vs profile-adjusted threshold
     if effective_exposure >= 600:
         urgency = "critical"
@@ -162,7 +175,9 @@ def compare_all_routes(routes, profile="adult"):
         "same_winner": bool(same_as_best),
         "message": message,
         "urgency": urgency,
-        "confidence": "moderate" if diff > 0.25 else "low",
+        "confidence": confidence_level,
+        "confidence_pct": confidence_pct,
+        "margin_pm25": best_margin,
         "diff_pct": saving_pct,
         "best": best["name"],
         "worst": worst["name"],

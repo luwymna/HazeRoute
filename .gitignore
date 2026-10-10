@@ -1,14 +1,28 @@
-# Environment variables
+# Environment / secrets
 .env
+.env.local
 
 # Python
+venv/
+.venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
-venv/
-env/
-.venv/
+
+# OS
+.DS_Store
+Thumbs.db
 
 # IDE
 .vscode/
 .idea/
+
+# Local data
+static/uploads/
+reports.json
+
+# Logs
+*.log
+
+# Vercel
+.vercel

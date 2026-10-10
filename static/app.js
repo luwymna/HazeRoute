@@ -260,7 +260,15 @@ function renderVerdict() {
   }[urgency] || "";
 
   verdictBox.className = `verdict ${verdict.winner ? 'winner' : 'tie'} urgency-${urgency}`;
-  verdictBox.textContent = urgencyIcon + verdict.message;
+  verdictBox.innerHTML = `
+    <div class="verdict-main">${urgencyIcon}${verdict.message}</div>
+    ${verdict.confidence_pct != null ? `
+      <div class="verdict-meta">
+        <span class="confidence-tag">Confidence: <b>${verdict.confidence_pct}%</b></span>
+        <span class="noise-tag">Uncertainty: <b>±${verdict.margin_pm25 != null ? verdict.margin_pm25 : '2.5'} µg/m³</b></span>
+      </div>
+    ` : ''}
+  `;
 }
 
 // ============================================================
