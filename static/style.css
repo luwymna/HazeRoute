@@ -1145,3 +1145,51 @@ body {
   font-size: 11px;
   font-style: italic;
 }
+
+.card-exposure {
+  margin: 10px 0 8px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+}
+
+.exp-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.exp-row-fc {
+  border-top: 1px dashed var(--rule-soft);
+  margin-top: 3px;
+  padding-top: 6px;
+  color: var(--ink-2);
+}
+
+.exp-label {
+  font-size: 11px;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.exp-pm {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.exp-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  min-width: 32px;
+  text-align: right;
+}
+
+.exp-row-fc .exp-val {
+  color: var(--blue);
+}

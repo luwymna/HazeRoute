@@ -44,13 +44,18 @@ def apply_sensitivity(exposure, profile):
 
 def compare_all_routes(routes, profile="adult"):
     """
-    Given 2–5 routes (each with 'name' and 'exposure'), pick the best.
-    `profile` adjusts verdict language for sensitive groups.
+    Given 2–5 routes (each with 'name', 'exposure', optional 'forecast_exposure',
+    and optional 'co2_kg'), pick the best.
 
-    Returns dict with winner, message, confidence, best, worst, all_scores,
-    plus profile metadata.
+    When forecast data is available, comparisons use forecast exposure at the
+    estimated arrival time. Otherwise, they fall back to current exposure.
     """
     scored = [r for r in routes if r.get("exposure") is not None]
+
+    # Prefer forecast exposure for comparison when available
+    for r in scored:
+        r["_compare_value"] = r.get("forecast_exposure") or r.get("exposure")
+        r["_using_forecast"] = r.get("forecast_exposure") is not None
 
     if len(scored) < 2:
         return {
@@ -58,23 +63,27 @@ def compare_all_routes(routes, profile="adult"):
             "message": "Not enough pollution data to compare routes.",
             "confidence": "none",
             "profile": profile,
+            "using_forecast": False,
         }
 
-    ranked = sorted(scored, key=lambda r: r["exposure"])
+    ranked = sorted(scored, key=lambda r: r["_compare_value"])
     best = ranked[0]
     worst = ranked[-1]
 
+    using_forecast = best["_using_forecast"]
+
     # All-zero case: air is clean everywhere
-    if worst["exposure"] == 0:
+    if worst["_compare_value"] == 0:
         return {
             "winner": None,
             "message": "Air quality is clean on all routes — comparable exposure.",
             "confidence": "low",
             "profile": profile,
-            "all_scores": {r["name"]: r["exposure"] for r in scored},
+            "using_forecast": using_forecast,
+            "all_scores": {r["name"]: r["_compare_value"] for r in scored},
         }
 
-    diff = (worst["exposure"] - best["exposure"]) / worst["exposure"]
+    diff = (worst["_compare_value"] - best["_compare_value"]) / worst["_compare_value"]
 
     # Routes are effectively tied
     if diff < 0.10:
@@ -84,53 +93,54 @@ def compare_all_routes(routes, profile="adult"):
             "confidence": "low",
             "diff_pct": round(diff * 100, 1),
             "profile": profile,
-            "all_scores": {r["name"]: r["exposure"] for r in scored},
+            "using_forecast": using_forecast,
+            "all_scores": {r["name"]: r["_compare_value"] for r in scored},
         }
 
     # Find the route with the lowest carbon cost
     scored_with_co2 = [r for r in scored if r.get("co2_kg") is not None]
     lowest_co2 = min(scored_with_co2, key=lambda r: r["co2_kg"]) if scored_with_co2 else None
-    same_as_best = lowest_co2 and lowest_co2["name"] == best["name"]
+    same_as_best = lowest_co2 is not None and lowest_co2["name"] == best["name"]
 
-    # --- Winner exists. Tailor the message by profile. ---
     saving_pct = round(diff * 100)
     sensitivity = SENSITIVITY_FACTORS.get(profile, 1.0)
-    effective_exposure = best["exposure"]  # already scaled by apply_sensitivity in app.py
+    effective_exposure = best["_compare_value"]  # the value actually used in comparison
+    best_display = round(best["_compare_value"])
 
+    # Prefix signals whether we're comparing current or predicted exposure
+    prefix = "Forecast: " if using_forecast else ""
+
+    # Choose message
     if effective_exposure > HIGH_EXPOSURE_THRESHOLD:
         # Even the cleanest route is above the safe threshold for this profile
         if profile in ("asthma", "child", "elderly"):
             message = (
-                f"Route {best['name']} is the lowest-exposure option, "
+                f"{prefix}Route {best['name']} is the lowest-exposure option, "
                 f"but estimated exposure is still high for your profile. "
                 f"Consider delaying travel or avoiding outdoor exertion."
             )
         else:
             message = (
-                f"Route {best['name']} has the lowest exposure, "
+                f"{prefix}Route {best['name']} has the lowest exposure, "
                 f"but levels are elevated — about {saving_pct}% lower "
                 f"than Route {worst['name']}."
             )
     elif same_as_best:
-        # Best route for exposure is ALSO best for carbon
         message = (
-            f"Route {best['name']} is best on both measures — lowest pollution "
-            f"exposure ({best['exposure']:.0f}) and lowest carbon "
+            f"{prefix}Route {best['name']} is best on both measures — lowest "
+            f"pollution exposure ({best_display}) and lowest carbon "
             f"({best['co2_kg']:.2f} kg CO₂)."
         )
     elif lowest_co2:
-        # Two different routes win on the two measures — the interesting case
         message = (
-            f"Route {best['name']} has the lowest pollution exposure "
-            f"({best['exposure']:.0f}). "
-            f"For the lowest carbon, choose Route {lowest_co2['name']} "
-            f"({lowest_co2['co2_kg']:.2f} kg CO₂)."
+            f"{prefix}Route {best['name']} has the lowest pollution exposure "
+            f"({best_display}). For the lowest carbon, choose Route "
+            f"{lowest_co2['name']} ({lowest_co2['co2_kg']:.2f} kg CO₂)."
         )
     else:
-        # No carbon data available — fall back to plain exposure message
         message = (
-            f"Route {best['name']} has the lowest estimated pollution exposure "
-            f"— about {saving_pct}% lower than Route {worst['name']}."
+            f"{prefix}Route {best['name']} has the lowest estimated pollution "
+            f"exposure — about {saving_pct}% lower than Route {worst['name']}."
         )
 
     return {
@@ -145,5 +155,6 @@ def compare_all_routes(routes, profile="adult"):
         "profile": profile,
         "sensitivity_factor": sensitivity,
         "effective_exposure": round(effective_exposure, 1),
-        "all_scores": {r["name"]: r["exposure"] for r in scored},
+        "using_forecast": using_forecast,
+        "all_scores": {r["name"]: r["_compare_value"] for r in scored},
     }

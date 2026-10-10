@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from services.geocode import geocode
 from services.routing import get_routes
-from services.air_quality import sample_route, get_pollution
+from services.air_quality import sample_route, sample_route_forecast, get_pollution
 from exposure import exposure_score, compare_all_routes, apply_sensitivity
 
 load_dotenv()
@@ -46,6 +46,8 @@ def api_geocode():
 # ============================================================
 @app.route("/api/compare", methods=["POST"])
 def compare():
+    import time
+
     data = request.json or {}
     start_q = (data.get("start") or "").strip()
     end_q = (data.get("end") or "").strip()
@@ -71,7 +73,8 @@ def compare():
     if not raw_routes:
         return jsonify({"error": "No route found between those points."}), 404
 
-    # Breathing factor by transport mode
+    departure_ts = int(time.time())
+
     mode_factor = {
         "drive": 1.0,
         "bike": 2.5,
@@ -82,20 +85,33 @@ def compare():
 
     results = []
     for i, r in enumerate(raw_routes):
+        # --- Current pollution + exposure ---
         pollution = sample_route(r["coords"])
         exposure = exposure_score(pollution, r["duration_s"])
         if exposure is not None:
             exposure *= mode_factor
             exposure = apply_sensitivity(exposure, profile)
 
-            co2_kg = (r["distance_m"] / 1000) * carbon_factor
+        # --- Forecast pollution at arrival ---
+        arrival_ts = departure_ts + int(r["duration_s"])
+        forecast_pm25 = sample_route_forecast(r["coords"], arrival_ts)
+        forecast_exposure = None
+        if forecast_pm25 is not None:
+            forecast_exposure = forecast_pm25 * (r["duration_s"] / 60) * mode_factor
+            forecast_exposure = apply_sensitivity(forecast_exposure, profile)
+
+        # --- Carbon (independent of pollution) ---
+        co2_kg = (r["distance_m"] / 1000) * carbon_factor
 
         results.append({
-            "name": chr(65 + i),  # A, B, C, D, E
+            "name": chr(65 + i),
             "duration_s": round(r["duration_s"]),
             "distance_m": round(r["distance_m"]),
             "pollution": pollution,
             "exposure": round(exposure, 1) if exposure is not None else None,
+            "forecast_pm25": round(forecast_pm25, 1) if forecast_pm25 is not None else None,
+            "forecast_exposure": round(forecast_exposure, 1) if forecast_exposure is not None else None,
+            "arrival_ts": arrival_ts,
             "co2_kg": round(co2_kg, 2),
             "coords": r["coords"],
             "start_name": start[2],
@@ -107,9 +123,11 @@ def compare():
     return jsonify({
         "routes": results,
         "verdict": verdict,
+        "departure_ts": departure_ts,
         "start": {"lon": start[0], "lat": start[1], "name": start[2]},
         "end": {"lon": end[0], "lat": end[1], "name": end[2]},
         "mode": mode,
+        "profile": profile,
     })
 
 

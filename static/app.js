@@ -216,6 +216,20 @@ function renderCards() {
         <div><b>${fmtDuration(r.duration_s)}</b> duration</div>
         <div><b>${fmtDistance(r.distance_m)}</b> distance</div>
       </div>
+      <div class="card-exposure">
+        <div class="exp-row">
+          <span class="exp-label">Now</span>
+          <span class="exp-pm">PM2.5 ${pollution ? pollution.pm2_5.toFixed(1) : "-"}</span>
+          <span class="exp-val">${r.exposure != null ? r.exposure.toFixed(0) : "-"}</span>
+        </div>
+        ${r.forecast_exposure != null ? `
+          <div class="exp-row">
+            <span class="exp-label">At arrival</span>
+            <span class="exp-pm">PM2.5 ${r.forecast_pm25.toFixed(1)}</span>
+            <span class="exp-val">${r.forecast_exposure.toFixed(0)}</span>
+          </div>
+        `: ''}
+      </div>
       <div class="pollution-list">${pollChips}</div>
       <div class="card-carbon">
         <span class="carbon-label">CO₂</span>

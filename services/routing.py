@@ -2,7 +2,9 @@ import os
 import math
 import json
 import base64
+import time
 import requests
+from requests.exceptions import ConnectionError, Timeout
 
 MAX_ROUTES = 5  # cap for display
 
@@ -51,10 +53,20 @@ def _call_ors(coords, profile="driving-car", alternatives=True):
             "Authorization": k,
             "Content-Type": "application/json",
         }
-        try:
-            r = requests.post(url, json=body, headers=headers, timeout=30)
-        except Exception as net_err:
-            raise RuntimeError(f"Could not connect to OpenRouteService: {net_err}")
+        r = None
+        last_net_err = None
+        for attempt in range(3):
+            try:
+                r = requests.post(url, json=body, headers=headers, timeout=30)
+                break
+            except (ConnectionError, Timeout) as net_err:
+                last_net_err = net_err
+                if attempt < 2:
+                    time.sleep(1.5 ** attempt)  # 1s, then 1.5s
+                continue
+
+        if r is None:
+            raise RuntimeError(f"Could not connect to OpenRouteService: {last_net_err}")
 
         if r.status_code in (401, 403) and len(keys_to_try) > 1 and k == keys_to_try[0]:
             last_resp = r
