@@ -120,6 +120,7 @@ def compare():
         if exposure is not None:
             exposure *= mode_factor
             exposure = apply_sensitivity(exposure, profile)
+        
 
         # --- Forecast pollution at arrival ---
         arrival_ts = departure_ts + int(r["duration_s"])
@@ -136,6 +137,58 @@ def compare():
         # --- Carbon (independent of pollution) ---
         co2_kg = (r["distance_m"] / 1000) * carbon_factor
 
+        # --- Per-route reasoning (plain language) ---
+        reasoning_why = []
+
+        minutes = round(r["duration_s"] / 60)
+        km = round(r["distance_m"] / 1000, 1)
+        reasoning_why.append(f"Takes about {minutes} min over {km} km.")
+
+        if pollution and pollution.get("pm2_5") is not None:
+            reasoning_why.append(
+                f"Current PM2.5 along the route: {pollution['pm2_5']:.1f} µg/m³."
+            )
+
+        if forecast_pm25 is not None:
+            reasoning_why.append(
+                f"Forecast PM2.5 at arrival: {forecast_pm25:.1f} µg/m³."
+            )
+
+        if pollution and forecast_pm25 is not None:
+            now_pm = pollution.get("pm2_5", 0)
+            delta_pm = forecast_pm25 - now_pm
+            if abs(delta_pm) >= 1.5:
+                direction = "higher" if delta_pm > 0 else "lower"
+                reasoning_why.append(
+                    f"Air is forecast to be {direction} at arrival "
+                    f"({now_pm:.1f} → {forecast_pm25:.1f} µg/m³)."
+                )
+
+        if mode == "bike" or mode == "cycle":
+            reasoning_why.append("Cycling multiplies exposure ×2.5 due to breathing rate.")
+        elif mode == "walk":
+            reasoning_why.append("Walking multiplies exposure ×2.0 due to breathing rate.")
+
+        if profile != "adult":
+            from exposure import SENSITIVITY_FACTORS
+            factor = SENSITIVITY_FACTORS.get(profile, 1.0)
+            reasoning_why.append(
+                f"Sensitivity factor ×{factor} applied for '{profile}' profile."
+            )
+
+        # Confidence in this route's forecast
+        if forecast_pm25 is None:
+            reasoning_conf = "Low — using current readings only"
+        elif pollution and abs(forecast_pm25 - pollution.get("pm2_5", forecast_pm25)) < 1.5:
+            reasoning_conf = "High — forecast and current readings agree"
+        else:
+            reasoning_conf = "Moderate — forecast and current readings differ"
+
+        reasoning = {
+            "why": reasoning_why,
+            "confidence": reasoning_conf,
+        }
+
         results.append({
             "name": chr(65 + i),
             "duration_s": round(r["duration_s"]),
@@ -151,6 +204,7 @@ def compare():
             "coords": r["coords"],
             "start_name": start[2],
             "end_name": end[2],
+            "reasoning": reasoning,
         })
 
     verdict = compare_all_routes(results, profile=profile)

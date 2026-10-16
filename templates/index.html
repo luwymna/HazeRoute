@@ -4,111 +4,124 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>JerebuRoute — Cleaner Route Planner</title>
-  <meta name="description" content="Compare routes by estimated pollution exposure.">
+  <title>JerebuRoute</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
 
+  <!-- Full-screen map -->
+  <div id="map"></div>
+
+  <div id="minimap" class="minimap"></div>
+
   <!-- ============================================================
-     Header — frosted glass, sticky
+     TOP-CENTER — brand pill
      ============================================================ -->
-  <header class="header">
-    <div class="header-inner">
-      <div class="brand">
-        <h1>JerebuRoute</h1>
+  <div class="brand-pill glass">
+    <span class="brand-dot"></span>
+    <span class="brand-name">JerebuRoute</span>
+  </div>
+
+  <!-- ============================================================
+     TOP-RIGHT — University AQI panel
+     ============================================================ -->
+  <div class="uni-panel glass">
+    <div class="uni-header">
+      <span class="uni-title">Campus AQI</span>
+      <button id="uniRefreshBtn" class="uni-refresh" title="Refresh">
+        <svg viewBox="0 0 24 24" width="14" height="14">
+          <path d="M20 11 A8 8 0 1 0 18.5 16" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" />
+          <path d="M20 6 V11 H15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+    <ul id="uniList" class="uni-list">
+      <li class="uni-loading">Loading campuses…</li>
+    </ul>
+  </div>
+
+  <!-- ============================================================
+     TOP-LEFT — stacked glass panel
+     Contains: inputs, compare button, route cards, samples
+     ============================================================ -->
+  <div class="panel-stack-left glass">
+    <div class="credit-badge">Built by Luqman Faris · Ahmad Afiq · Haziq Irfan · Jagerdyswarean</div>
+
+    <!-- Routes input group -->
+    <div class="routes-panel">
+      <div class="input-wrap">
+        <span class="input-dot input-dot-start"></span>
+        <input id="start" type="text" autocomplete="off" placeholder="Start — place or coordinates" aria-label="Start">
+      </div>
+      <button type="button" id="swapBtn" class="swap-btn" aria-label="Swap">
+        <svg viewBox="0 0 20 20" width="14" height="14">
+          <path d="M5 3 L5 15 M5 15 L2 12 M5 15 L8 12 M15 17 L15 5 M15 5 L12 8 M15 5 L18 8" fill="none"
+            stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div class="input-wrap">
+        <span class="input-dot input-dot-end"></span>
+        <input id="end" type="text" autocomplete="off" placeholder="Destination — place or coordinates"
+          aria-label="Destination">
       </div>
     </div>
-  </header>
 
-  <!-- ============================================================
-     Control bar — horizontal, above map
-     ============================================================ -->
-  <section class="control-bar-wrap">
-    <div class="control-bar">
+    <!-- Action row: locate + compare + mode picker -->
+    <div class="action-row">
+      <button type="button" id="locateBtn" class="btn-icon" aria-label="Use my location" title="Use my location">
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M12 2 V5 M12 19 V22 M2 12 H5 M19 12 H22" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round" />
+        </svg>
+      </button>
 
-      <!-- Start / swap / destination -->
-      <div class="route-inputs">
-        <div class="input-wrap">
-          <span class="input-dot input-dot-start" aria-hidden="true"></span>
-          <input id="start" type="text" autocomplete="off" placeholder="Start — place or coordinates"
-            aria-label="Start location">
-        </div>
+      <button type="button" id="compareBtn" class="btn-primary">
+        <span class="btn-text">Compare routes</span>
+        <span class="spinner" hidden></span>
+      </button>
 
-        <button type="button" id="swapBtn" class="swap-btn" title="Swap start and destination" aria-label="Swap">
-          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-            <path d="M5 3 L5 15 M5 15 L2 12 M5 15 L8 12 M15 17 L15 5 M15 5 L12 8 M15 5 L18 8" fill="none"
-              stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-
-        <div class="input-wrap">
-          <span class="input-dot input-dot-end" aria-hidden="true"></span>
-          <input id="end" type="text" autocomplete="off" placeholder="Destination — place or coordinates"
-            aria-label="Destination">
-        </div>
-      </div>
-
-      <!-- Travel mode icon buttons -->
       <div class="mode-group" role="radiogroup" aria-label="Travel mode">
         <button type="button" class="mode-btn active" data-mode="drive" aria-label="Driving" title="Driving">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18">
             <path d="M5 11 L6.5 6.2 A2 2 0 0 1 8.4 4.8 H15.6 A2 2 0 0 1 17.5 6.2 L19 11
                    M5 11 H19 M5 11 V17 A1 1 0 0 0 6 18 H7 A1 1 0 0 0 8 17 V16 H16 V17
                    A1 1 0 0 0 17 18 H18 A1 1 0 0 0 19 17 V11" fill="none" stroke="currentColor" stroke-width="1.6"
               stroke-linecap="round" stroke-linejoin="round" />
-            <circle cx="7.5" cy="13.5" r="1.2" fill="currentColor" />
-            <circle cx="16.5" cy="13.5" r="1.2" fill="currentColor" />
+            <circle cx="7.5" cy="13.5" r="1.1" fill="currentColor" />
+            <circle cx="16.5" cy="13.5" r="1.1" fill="currentColor" />
           </svg>
         </button>
-
         <button type="button" class="mode-btn" data-mode="bike" aria-label="Cycling" title="Cycling">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18">
             <circle cx="5.5" cy="17" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
             <circle cx="18.5" cy="17" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
             <path d="M5.5 17 L10 8 L14 8 M10 8 L14.5 17 M18.5 17 L15.5 8 M13 5.5 H16.5" fill="none"
               stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-            <circle cx="10" cy="5" r="1.4" fill="none" stroke="currentColor" stroke-width="1.6" />
           </svg>
         </button>
-
         <button type="button" class="mode-btn" data-mode="walk" aria-label="Walking" title="Walking">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <circle cx="12.5" cy="4.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <circle cx="12.5" cy="4.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6" />
             <path d="M12 8 L10.5 12 L13 14 L12 20 M10.5 12 L8 15 L6 20 M13 14 L16 15 L17 20 M10 9 L7 9 M13 9 L16 10"
               fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </button>
       </div>
-
-      <!-- Actions -->
-      <div class="actions">
-        <button type="button" id="locateBtn" class="btn-ghost" title="Use my current location"
-          aria-label="Use my location">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
-            <path d="M12 2 V5 M12 19 V22 M2 12 H5 M19 12 H22" stroke="currentColor" stroke-width="1.6"
-              stroke-linecap="round" />
-            <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.35" />
-          </svg>
-        </button>
-
-        <button type="button" id="compareBtn" class="btn-primary">
-          <span class="btn-text">Compare routes</span>
-          <span class="spinner" hidden></span>
-        </button>
-      </div>
     </div>
 
+    <!-- Profile selector -->
     <div class="profile-row">
-      <span class="profile-label">I am a</span>
-      <div class="profile-group" role="radiogroup">
+      <span class="profile-label">Profile</span>
+      <div class="profile-group" role="radiogroup" aria-label="Sensitivity profile">
         <button type="button" class="profile-btn active" data-profile="adult">Adult</button>
         <button type="button" class="profile-btn" data-profile="child">Child</button>
         <button type="button" class="profile-btn" data-profile="elderly">Elderly</button>
@@ -117,50 +130,39 @@
       </div>
     </div>
 
-    <!-- Sample chips row -->
-    <div class="samples-bar">
-      <span class="samples-label">Or try a sample</span>
+    <!-- Sample chips -->
+    <div class="samples-row">
+      <span class="samples-label">Try</span>
       <button class="chip" data-start="Alor Setar, Kedah" data-end="Sungai Petani, Kedah">Kedah</button>
-      <button class="chip" data-start="KLCC, Kuala Lumpur" data-end="Mid Valley, Kuala Lumpur">Kuala Lumpur</button>
+      <button class="chip" data-start="KLCC, Kuala Lumpur" data-end="Mid Valley, Kuala Lumpur">KL</button>
       <button class="chip" data-start="Johor Bahru, Johor" data-end="Skudai, Johor">Johor</button>
     </div>
-  </section>
 
-  <section class="map-wrap">
-    <div id="map"></div>
-    <div id="legend" class="legend" hidden>
-      <div><span class="dot dot-winner"></span>Lower exposure</div>
-      <div><span class="dot dot-loser"></span>Higher exposure</div>
+    <!-- Empty state (shown before first comparison) -->
+    <div id="emptyState" class="empty-state">
+      Enter a start and destination, then tap <b>Compare routes</b> to see exposure comparisons.
     </div>
-  </section>
 
-  <!-- ============================================================
-     Result strip — verdict + route cards below the map
-     ============================================================ -->
-  <section class="results-wrap">
+    <!-- Mini-stats row (populated by JS after comparison) -->
+    <div id="miniStats" class="mini-stats" hidden></div>
 
-    <p class="banner">
-      <strong>Estimates only.</strong> Pollution data is city-level and hourly.
-      Travel times use speed limits, not live traffic. Not medical advice.
-    </p>
+    <!-- Route cards go here -->
+    <div id="routeCards" class="route-list"></div>
 
-    <div id="error" class="error" hidden></div>
+  </div>
 
-    <div id="verdict" class="verdict" hidden></div>
+  <!-- Floating error / verdict -->
+  <div id="error" class="error-float glass" hidden></div>
+  <div id="verdict" class="verdict-float glass" hidden></div>
 
-    <div id="routeCards" class="route-cards"></div>
-
-  </section>
-
-  <!-- ============================================================
-     Footer
-     ============================================================ -->
-  <footer class="footer">
-    Data from OpenRouteService, OpenWeather, and OpenStreetMap.<br>
-    Exposure estimate: PM2.5 (µg/m³) × travel time (min) × breathing factor.
-  </footer>
+  <!-- Legend -->
+  <div id="legend" class="legend glass" hidden>
+    <div><span class="dot dot-winner"></span>Lower exposure</div>
+    <div><span class="dot dot-loser"></span>Higher exposure</div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 
 </body>
