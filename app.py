@@ -1,3 +1,5 @@
+import os
+import requests
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
@@ -22,7 +24,6 @@ CARBON_FACTORS = {
     "walk":   0.0,
 }
 
-
 # ============================================================
 # Pages
 # ============================================================
@@ -30,6 +31,29 @@ CARBON_FACTORS = {
 def index():
     return render_template("index.html")
 
+# ============================================================
+# IPU NUMBER
+# ============================================================
+@app.route("/api/malaysia-stations")
+def malaysia_stations():
+    """Fetch AQICN stations across Malaysia via the map bounds endpoint."""
+    token = os.getenv("AQICN_TOKEN")
+    if not token:
+        return jsonify({"error": "AQICN token not configured"}), 500
+
+    # AQICN's map/bounds endpoint returns all stations in a lat/lng box.
+    # Bounding box covers peninsular + Borneo Malaysia.
+    url = f"https://api.waqi.info/map/bounds/?latlng=0.5,99.0,7.5,120.0&token={token}"
+
+    try:
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+        if data.get("status") != "ok":
+            return jsonify({"error": "AQICN returned an error"}), 502
+        return jsonify(data.get("data", []))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
 
 # ============================================================
 # API: geocode a single query
@@ -140,50 +164,6 @@ def compare():
         "mode": mode,
         "profile": profile,
     })
-
-
-# ============================================================
-# API: Malaysia air quality — top 10 by current API reading
-# ============================================================
-@app.route("/api/my-air-quality")
-def my_air_quality():
-    locations = [
-        {"name": "Pasir Gudang, Johor",       "lat": 1.4724, "lon": 103.9089},
-        {"name": "Batu Pahat, Johor",         "lat": 1.8548, "lon": 102.9320},
-        {"name": "Segamat, Johor",            "lat": 2.5147, "lon": 102.8156},
-        {"name": "Seremban, Negeri Sembilan", "lat": 2.7259, "lon": 101.9378},
-        {"name": "Cheras, Kuala Lumpur",      "lat": 3.0387, "lon": 101.7448},
-        {"name": "Shah Alam, Selangor",       "lat": 3.0733, "lon": 101.5185},
-        {"name": "Bukit Rambai, Melaka",      "lat": 2.2778, "lon": 102.1772},
-        {"name": "Tasek Ipoh, Perak",         "lat": 4.6116, "lon": 101.0917},
-        {"name": "Putrajaya",                 "lat": 2.9264, "lon": 101.6964},
-        {"name": "Kuantan, Pahang",           "lat": 3.8077, "lon": 103.3260},
-        {"name": "Kota Kinabalu, Sabah",      "lat": 5.9804, "lon": 116.0735},
-        {"name": "Kuching, Sarawak",          "lat": 1.5533, "lon": 110.3592},
-    ]
-
-    def fetch_api(loc):
-        p = get_pollution(loc["lat"], loc["lon"])
-        api = None
-        if p and p.get("pm2_5") is not None:
-            pm = p["pm2_5"]
-            if pm <= 12:
-                api = round(pm * 4)
-            elif pm <= 35:
-                api = round(50 + (pm - 12) * 2)
-            elif pm <= 55:
-                api = round(100 + (pm - 35) * 2)
-            elif pm <= 150:
-                api = round(150 + (pm - 55) * 0.5)
-            else:
-                api = round(200 + (pm - 150) * 0.3)
-        return {**loc, "api": api}
-
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        results = list(executor.map(fetch_api, locations))
-
-    return jsonify(results)
-
 
 # ============================================================
 # Run

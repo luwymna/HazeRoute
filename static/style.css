@@ -726,342 +726,6 @@ body {
 }
 
 /* ============================================================
-   Malaysia Air Quality Panel
-   ============================================================ */
-/* ============================================================
-   Two-column layout: air panel (left) + map (right)
-   ============================================================ */
-.main-split {
-  max-width: var(--max-w);
-  margin: 20px auto 0;
-  padding: 0 32px;
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  /* fixed 340px left column */
-  gap: 20px;
-  align-items: start;
-}
-
-/* Left column — Malaysia air quality */
-.my-air-wrap {
-  /* no margin/padding now — the grid wrapper handles it */
-}
-
-.my-air-panel {
-  background: var(--surface);
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
-  padding: 16px 20px;
-}
-
-.my-air-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--rule-soft);
-}
-
-.my-air-header h2 {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: var(--ink);
-  margin: 0;
-}
-
-.my-air-sub {
-  font-size: 12px;
-  color: var(--ink-4);
-  margin: 2px 0 0;
-}
-
-.btn-ghost-sm {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: var(--r-sm);
-  color: var(--ink-3);
-  cursor: pointer;
-  transition: background 0.15s var(--ease);
-}
-
-.btn-ghost-sm:hover {
-  background: var(--surface-2);
-  color: var(--ink);
-}
-
-/* Vertical list (single column since panel is narrow) */
-.my-air-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-  margin: 0;
-  counter-reset: rank;
-}
-
-.my-air-list li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  padding: 8px 0;
-  border-bottom: 1px dashed var(--rule-soft);
-  counter-increment: rank;
-}
-
-.my-air-list li:last-child {
-  border-bottom: none;
-}
-
-.my-air-list li::before {
-  content: counter(rank);
-  flex-shrink: 0;
-  width: 18px;
-  font-size: 11px;
-  color: var(--ink-4);
-  text-align: right;
-}
-
-.my-air-list .loc-name {
-  flex: 1;
-  color: var(--ink);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.my-air-list .api-val {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--ink);
-  font-size: 13px;
-}
-
-.badge-api {
-  display: inline-block;
-  padding: 2px 8px;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  border-radius: 100px;
-  white-space: nowrap;
-}
-
-.badge-good {
-  background: rgba(92, 111, 58, 0.15);
-  color: #405026;
-}
-
-.badge-moderate {
-  background: rgba(179, 123, 40, 0.15);
-  color: #7a5215;
-}
-
-.badge-unhealthy {
-  background: rgba(168, 71, 44, 0.15);
-  color: #7a2f1c;
-}
-
-.badge-very {
-  background: rgba(120, 30, 30, 0.15);
-  color: #7a1e1e;
-}
-
-.badge-hazardous {
-  background: rgba(90, 10, 10, 0.2);
-  color: #5a0a0a;
-}
-
-.my-air-loading {
-  color: var(--ink-4);
-  font-size: 13px;
-  padding: 10px 0;
-}
-
-.my-air-loading::before {
-  content: none;
-}
-
-/* Safety reminders */
-.safety-note {
-  margin-top: 14px;
-  border-top: 1px solid var(--rule-soft);
-  padding-top: 12px;
-}
-
-.safety-note summary {
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-2);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.safety-note summary::before {
-  content: "▸";
-  color: var(--ink-4);
-  transition: transform 0.15s var(--ease);
-}
-
-.safety-note[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.safety-content {
-  padding: 10px 0 4px 20px;
-  font-size: 12px;
-  color: var(--ink-2);
-  line-height: 1.6;
-}
-
-.safety-content ul {
-  padding-left: 16px;
-  margin: 0 0 8px;
-}
-
-.safety-content li {
-  margin-bottom: 4px;
-}
-
-.safety-meta {
-  font-size: 11px;
-  color: var(--ink-4);
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--rule-soft);
-}
-
-/* Right column — map (replaces the old .map-wrap) */
-.main-split .map-wrap {
-  position: relative;
-  /* remove max-width/margin/padding — the grid handles it now */
-  max-width: none;
-  margin: 0;
-  padding: 0;
-}
-
-/* Responsive — stack on small screens */
-@media (max-width: 900px) {
-  .main-split {
-    grid-template-columns: 1fr;
-    padding: 0 20px;
-  }
-
-  .my-air-list li {
-    padding: 6px 0;
-  }
-}
-
-/* ============================================================
-   Data source disclaimer
-   ============================================================ */
-.source-note {
-  display: flex;
-  gap: 10px;
-  padding: 10px 12px;
-  margin: 10px 0 12px;
-  background: rgba(179, 123, 40, 0.08);
-  border: 1px solid rgba(179, 123, 40, 0.25);
-  border-radius: var(--r-md);
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: #6b4a15;
-}
-
-.source-note-icon {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(179, 123, 40, 0.25);
-  color: #6b4a15;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  font-family: Georgia, serif;
-  margin-top: 1px;
-}
-
-.source-note-text b {
-  color: #523510;
-  font-weight: 600;
-}
-
-.source-note a {
-  color: #6b4a15;
-  font-weight: 500;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 2px;
-}
-
-.source-note a:hover {
-  color: #523510;
-}
-
-/* ============================================================
-   Safety callout inside the reminders
-   ============================================================ */
-.safety-callout {
-  padding: 8px 10px;
-  margin-bottom: 12px;
-  background: rgba(168, 71, 44, 0.08);
-  border-left: 3px solid var(--red);
-  border-radius: 2px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #6b2a1a;
-}
-
-.safety-callout a {
-  color: var(--red);
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.safety-subhead {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-3);
-  margin: 12px 0 6px;
-}
-
-.safety-subhead:first-of-type {
-  margin-top: 4px;
-}
-
-.safety-content ul {
-  padding-left: 16px;
-  margin: 0 0 4px;
-  font-size: 12px;
-  color: var(--ink-2);
-  line-height: 1.55;
-}
-
-.safety-content li {
-  margin-bottom: 5px;
-}
-
-/* ============================================================
    Personal sensitivity profile row
    ============================================================ */
 .profile-row {
@@ -1269,4 +933,30 @@ body {
 .noise-tag b {
   color: var(--ink);
   font-weight: 600;
+}
+
+.aqi-marker {
+  background: transparent;
+  border: none;
+}
+
+.aqi-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.aqi-circle:hover {
+  transform: scale(1.12);
+  z-index: 999;
 }

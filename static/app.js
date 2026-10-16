@@ -1,9 +1,68 @@
 const map = L.map('map').setView([3.1390, 101.6869], 7);
 
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-  attribution: '© Esri, HERE, Garmin, © OpenStreetMap contributors',
-  maxZoom: 16,
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19,
 }).addTo(map);
+
+// ============================================================
+// AQICN station markers
+// ============================================================
+
+function aqiColor(aqi) {
+  if (aqi <= 50) return "#00e400";   // Good — green
+  if (aqi <= 100) return "#ffff00";   // Moderate — yellow
+  if (aqi <= 150) return "#ff7e00";   // Unhealthy for sensitive — orange
+  if (aqi <= 200) return "#ff0000";   // Unhealthy — red
+  if (aqi <= 300) return "#8f3f97";   // Very Unhealthy — purple
+  return "#7e0023";                    // Hazardous — maroon
+}
+
+async function loadStations() {
+  try {
+    const res = await fetch("/api/malaysia-stations");
+    const stations = await res.json();
+    if (!Array.isArray(stations)) return;
+
+    stations.forEach((s) => {
+      const aqi = parseInt(s.aqi, 10);
+      if (isNaN(aqi)) return;
+
+      const color = aqiColor(aqi);
+
+      L.marker([s.lat, s.lon], {
+        icon: L.divIcon({
+          className: "aqi-marker",
+          html: `<div class="aqi-circle" style="background:${color}">${aqi}</div>`,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20],
+        }),
+      })
+        .addTo(map)
+        .bindPopup(
+          `<b>${s.station.name}</b><br>AQI: ${aqi}<br><a href="${s.station.url}" target="_blank">View on AQICN →</a>`
+        );
+    });
+  } catch (e) {
+    console.warn("Could not load AQICN stations:", e);
+  }
+}
+
+// Fire after the map is created
+loadStations();
+
+let showStations = true;
+let showRoutes = true;
+
+function applyVisibility() {
+  document.querySelectorAll(".aqi-marker").forEach(el => {
+    el.style.display = showStations ? "" : "none";
+  });
+  layers.forEach(l => {
+    if (showRoutes) l.addTo(map);
+    else map.removeLayer(l);
+  });
+}
 
 // ---------- State ----------
 let layers = [];
@@ -320,52 +379,6 @@ async function compare() {
 }
 
 // ============================================================
-// Malaysia Air Quality Panel
-// ============================================================
-function apiCategory(api) {
-  if (api == null) return { cls: "badge-moderate", label: "—" };
-  if (api <= 50) return { cls: "badge-good", label: "Low" };
-  if (api <= 100) return { cls: "badge-moderate", label: "Elevated" };
-  if (api <= 200) return { cls: "badge-unhealthy", label: "High" };
-  if (api <= 300) return { cls: "badge-very", label: "Very High" };
-  return { cls: "badge-hazardous", label: "Extreme" };
-}
-
-async function loadMalaysiaAirQuality() {
-  const list = document.getElementById('myAirList');
-  if (!list) return;
-
-  list.innerHTML = '<li class="my-air-loading">Loading air quality data…</li>';
-
-  try {
-    const res = await fetch('/api/my-air-quality');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const results = await res.json();
-
-    const ranked = results
-      .filter(r => r.api != null)
-      .sort((a, b) => b.api - a.api)
-      .slice(0, 10);
-
-    if (ranked.length === 0) {
-      list.innerHTML = '<li class="my-air-loading">Data unavailable. See <b>apims.doe.gov.my</b> for official readings.</li>';
-      return;
-    }
-
-    list.innerHTML = ranked.map(r => {
-      const cat = apiCategory(r.api);
-      return `<li>
-        <span class="loc-name">${r.name}</span>
-        <span class="api-val">${r.api}</span>
-        <span class="badge-api ${cat.cls}">${cat.label}</span>
-      </li>`;
-    }).join('');
-  } catch (e) {
-    list.innerHTML = '<li class="my-air-loading">Could not reach the server. Check Flask logs.</li>';
-  }
-}
-
-// ============================================================
 // Event wiring
 // ============================================================
 compareBtn.addEventListener('click', compare);
@@ -437,11 +450,4 @@ document.addEventListener('keydown', (e) => {
   }
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= currentData.routes.length) selectRoute(n - 1);
-});
-
-// Malaysia panel — load on page ready + wire refresh
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('refreshAirBtn');
-  if (btn) btn.addEventListener('click', loadMalaysiaAirQuality);
-  loadMalaysiaAirQuality();
 });
