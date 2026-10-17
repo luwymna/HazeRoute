@@ -1,5 +1,6 @@
 import os
 import requests
+import math 
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
@@ -253,6 +254,65 @@ def compare():
         "mode": mode,
         "profile": profile,
     })
+
+# ============================================================
+# API: Nearest AQI Stations (For iOS Widget)
+# ============================================================
+@app.route("/api/nearest-stations")
+def nearest_stations():
+    user_lat = request.args.get("lat", type=float)
+    user_lon = request.args.get("lon", type=float)
+    
+    if not user_lat or not user_lon:
+        return jsonify({"error": "Missing lat/lon parameters"}), 400
+
+    # Re-use the AQICN fetch logic
+    token = os.getenv("AQICN_TOKEN")
+    if not token:
+        return jsonify({"error": "AQICN token not configured"}), 500
+
+    url = f"https://api.waqi.info/map/bounds/?latlng=0.5,99.0,7.5,120.0&token={token}"
+    
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        stations = data.get("data", [])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+    # Calculate distance for each station
+    valid_stations = []
+    for s in stations:
+        try:
+            aqi_str = s.get("aqi", "-1")
+            # AQICN sometimes returns "-" for offline stations
+            if aqi_str == "-": continue
+            aqi = int(aqi_str)
+            if aqi < 0: continue
+            
+            # Haversine distance
+            lat2, lon2 = s["lat"], s["lon"]
+            R = 6371.0 # Earth radius in km
+            dLat = math.radians(lat2 - user_lat)
+            dLon = math.radians(lon2 - user_lon)
+            a = math.sin(dLat/2)**2 + math.cos(math.radians(user_lat)) * math.cos(math.radians(lat2)) * math.sin(dLon/2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            dist_km = round(R * c, 1)
+            
+            valid_stations.append({
+                "name": s["station"]["name"],
+                "aqi": aqi,
+                "dist_km": dist_km
+            })
+        except Exception:
+            continue
+
+    # Sort by distance (closest first) and get top 3
+    valid_stations.sort(key=lambda x: x["dist_km"])
+    top_3 = valid_stations[:3]
+
+    return jsonify(top_3)
 
 
 # ============================================================
