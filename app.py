@@ -11,18 +11,38 @@ from services.air_quality import (
     sample_route_forecast_with_margin,
     get_pollution,
 )
-from exposure import exposure_score, compare_all_routes, apply_sensitivity
+from exposure import (
+    exposure_score,
+    compare_all_routes,
+    apply_sensitivity,
+    SENSITIVITY_FACTORS,
+)
 
 load_dotenv()
 app = Flask(__name__)
 
-# kg CO2 per km — fuel-burned only
+# kg CO2 per passenger-km — fuel only (transit is an average bus/rail estimate)
 CARBON_FACTORS = {
-    "drive":  0.162,
-    "bike":   0.016,
-    "cycle":  0.016,
-    "walk":   0.0,
+    "drive":   0.162,
+    "bike":    0.016,
+    "cycle":   0.016,
+    "walk":    0.0,
+    "transit": 0.089,
 }
+
+# Breathing-rate / exposure multipliers
+MODE_FACTORS = {
+    "drive":   1.0,
+    "bike":    2.5,
+    "cycle":   2.5,
+    "walk":    2.0,
+    "transit": 1.2,   # mostly in-vehicle, plus walking and waiting at stops
+}
+
+# Transit is estimated from the road route
+TRANSIT_SPEED_FACTOR = 1.4   # stops and slower average speed
+TRANSIT_WAIT_S = 300         # ~5 min average wait
+
 
 # ============================================================
 # Pages
@@ -30,6 +50,7 @@ CARBON_FACTORS = {
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 # ============================================================
 # IPU NUMBER
@@ -54,6 +75,7 @@ def malaysia_stations():
         return jsonify(data.get("data", []))
     except Exception as e:
         return jsonify({"error": str(e)}), 502
+
 
 # ============================================================
 # API: geocode a single query
@@ -94,8 +116,11 @@ def compare():
     if not end:
         return jsonify({"error": f"Could not locate end: '{end_q}'"}), 400
 
+    # Transit has no routing profile — use the road route and estimate from it
+    route_mode = "drive" if mode == "transit" else mode
+
     try:
-        raw_routes = get_routes((start[0], start[1]), (end[0], end[1]), mode=mode)
+        raw_routes = get_routes((start[0], start[1]), (end[0], end[1]), mode=route_mode)
     except Exception as e:
         return jsonify({"error": f"Routing failed: {e}"}), 502
 
@@ -104,34 +129,33 @@ def compare():
 
     departure_ts = int(time.time())
 
-    mode_factor = {
-        "drive": 1.0,
-        "bike": 2.5,
-        "cycle": 2.5,
-        "walk": 2.0,
-    }.get(mode, 1.0)
+    mode_factor = MODE_FACTORS.get(mode, 1.0)
     carbon_factor = CARBON_FACTORS.get(mode, 0.162)
 
     results = []
     for i, r in enumerate(raw_routes):
+        # --- Effective duration (transit = slower + wait) ---
+        duration_s = r["duration_s"]
+        if mode == "transit":
+            duration_s = duration_s * TRANSIT_SPEED_FACTOR + TRANSIT_WAIT_S
+
         # --- Current pollution + exposure ---
         pollution = sample_route(r["coords"])
-        exposure = exposure_score(pollution, r["duration_s"])
+        exposure = exposure_score(pollution, duration_s)
         if exposure is not None:
             exposure *= mode_factor
             exposure = apply_sensitivity(exposure, profile)
-        
 
         # --- Forecast pollution at arrival ---
-        arrival_ts = departure_ts + int(r["duration_s"])
+        arrival_ts = departure_ts + int(duration_s)
         forecast_pm25, forecast_margin = sample_route_forecast_with_margin(r["coords"], arrival_ts)
         forecast_exposure = None
         forecast_exposure_margin = None
         if forecast_pm25 is not None:
-            forecast_exposure = forecast_pm25 * (r["duration_s"] / 60) * mode_factor
+            forecast_exposure = forecast_pm25 * (duration_s / 60) * mode_factor
             forecast_exposure = apply_sensitivity(forecast_exposure, profile)
             if forecast_margin is not None:
-                forecast_exposure_margin = forecast_margin * (r["duration_s"] / 60) * mode_factor
+                forecast_exposure_margin = forecast_margin * (duration_s / 60) * mode_factor
                 forecast_exposure_margin = apply_sensitivity(forecast_exposure_margin, profile)
 
         # --- Carbon (independent of pollution) ---
@@ -140,7 +164,7 @@ def compare():
         # --- Per-route reasoning (plain language) ---
         reasoning_why = []
 
-        minutes = round(r["duration_s"] / 60)
+        minutes = round(duration_s / 60)
         km = round(r["distance_m"] / 1000, 1)
         reasoning_why.append(f"Takes about {minutes} min over {km} km.")
 
@@ -164,13 +188,17 @@ def compare():
                     f"({now_pm:.1f} → {forecast_pm25:.1f} µg/m³)."
                 )
 
-        if mode == "bike" or mode == "cycle":
+        if mode in ("bike", "cycle"):
             reasoning_why.append("Cycling multiplies exposure ×2.5 due to breathing rate.")
         elif mode == "walk":
             reasoning_why.append("Walking multiplies exposure ×2.0 due to breathing rate.")
+        elif mode == "transit":
+            reasoning_why.append(
+                "Transit is estimated from the road route (about +40% time plus a 5 min wait); "
+                "exposure ×1.2 for walking and waiting at stops."
+            )
 
         if profile != "adult":
-            from exposure import SENSITIVITY_FACTORS
             factor = SENSITIVITY_FACTORS.get(profile, 1.0)
             reasoning_why.append(
                 f"Sensitivity factor ×{factor} applied for '{profile}' profile."
@@ -191,7 +219,7 @@ def compare():
 
         results.append({
             "name": chr(65 + i),
-            "duration_s": round(r["duration_s"]),
+            "duration_s": round(duration_s),
             "distance_m": round(r["distance_m"]),
             "pollution": pollution,
             "exposure": round(exposure, 1) if exposure is not None else None,
@@ -218,6 +246,7 @@ def compare():
         "mode": mode,
         "profile": profile,
     })
+
 
 # ============================================================
 # Run

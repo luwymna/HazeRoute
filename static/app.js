@@ -1,12 +1,87 @@
 const map = L.map('map').setView([3.1390, 101.6869], 7);
 
-L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-  {
-    maxZoom: 19,
-    attribution: 'Tiles powered by Esri',
-  }
-).addTo(map);
+// ============================================================
+// Themes + base map
+// ============================================================
+const THEMES = [
+  { id: '', name: 'Earth', swatch: ['#fdfbf6', '#9c4a1e'] },
+  { id: 'haze', name: 'Haze', swatch: ['#f6f4f0', '#b8641a'] },
+  { id: 'ocean', name: 'Ocean', swatch: ['#fbfdfd', '#0f766e'] },
+  { id: 'forest', name: 'Forest', swatch: ['#fafbf7', '#3b6b4a'] },
+  { id: 'slate', name: 'Slate', swatch: ['#fafbfc', '#4451c9'] },
+  { id: 'night', name: 'Night', swatch: ['#171b24', '#e2b45f'] },
+];
+
+const TILES = {
+  light: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    opts: { maxZoom: 19, attribution: 'Tiles powered by Esri' },
+  },
+  dark: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    opts: { maxZoom: 19, attribution: 'Tiles powered by Esri' },
+  },
+};
+
+let baseLayer = null;
+let tileKind = null;
+
+function setBaseMap(kind) {
+  if (kind === tileKind) return;
+  if (baseLayer) map.removeLayer(baseLayer);
+  baseLayer = L.tileLayer(TILES[kind].url, TILES[kind].opts).addTo(map);
+  baseLayer.bringToBack();
+  tileKind = kind;
+}
+
+function applyTheme(id) {
+  const root = document.documentElement;
+  if (id) root.dataset.theme = id;
+  else delete root.dataset.theme;
+  try { localStorage.setItem('theme', id); } catch { }
+  setBaseMap(id === 'night' ? 'dark' : 'light');
+  document.querySelectorAll('.theme-option').forEach((b) =>
+    b.classList.toggle('active', b.dataset.themeId === id));
+}
+
+(function initThemeMenu() {
+  let saved = '';
+  try { saved = localStorage.getItem('theme') || ''; } catch { }
+  if (!THEMES.some((t) => t.id === saved)) saved = '';
+
+  const btn = document.getElementById('themeBtn');
+  const menu = document.getElementById('themeMenu');
+  if (!btn || !menu) { applyTheme(saved); return; }
+
+  menu.innerHTML = THEMES.map((t) => `
+    <button type="button" class="theme-option" data-theme-id="${t.id}">
+      <span class="theme-swatch"
+        style="background:linear-gradient(135deg, ${t.swatch[0]} 50%, ${t.swatch[1]} 50%)"></span>
+      <span>${t.name}</span>
+    </button>`).join('');
+
+  const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opening = menu.hidden;
+    menu.hidden = !opening;
+    btn.setAttribute('aria-expanded', String(opening));
+  });
+
+  menu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const opt = e.target.closest('.theme-option');
+    if (!opt) return;
+    applyTheme(opt.dataset.themeId);
+    close();
+  });
+
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+  applyTheme(saved);
+})();
 
 let layers = [];
 let markers = [];
@@ -15,6 +90,7 @@ let activeIdx = -1;
 let expandedRoutes = new Set();
 let heatLayer = null;
 let showStations = true;
+let showHeat = true;
 let showRoutes = true;
 
 // ============================================================
@@ -56,7 +132,7 @@ async function loadStations() {
           `<div style="font-family:inherit;font-size:13px;line-height:1.5">
              <b>${s.station.name}</b><br>
              AQI: <b>${aqi}</b><br>
-             <a href="${s.station.url}" target="_blank" style="color:#9c4a1e">View on AQICN →</a>
+             <a href="${s.station.url}" target="_blank" style="color:var(--blue)">View on AQICN →</a>
            </div>`
         );
     });
@@ -85,7 +161,8 @@ async function loadStations() {
         0.9: '#8f3f97',   // Very Unhealthy
         1.0: '#7e0023',   // Hazardous
       },
-    }).addTo(map);
+    });
+    if (showHeat) heatLayer.addTo(map);
 
   } catch (e) {
     console.warn("Could not load AQICN stations:", e);
@@ -116,6 +193,13 @@ const cardsBox = $('routeCards');
 const legend = $('legend');
 const emptyState = $('emptyState');
 const miniStats = $('miniStats');
+const routesPanel = document.querySelector('.routes-panel');
+const routeSummary = $('routeSummary');
+
+function setInputsCollapsed(on) {
+  routesPanel.classList.toggle('is-collapsed', on);
+  routeSummary.hidden = !on;
+}
 
 // ---------- Colour palette for routes ----------
 const ALT_COLORS = ['#b37b28', '#a8472c', '#7a4f8f', '#3a7a8a', '#8a7a3a'];
@@ -309,7 +393,7 @@ function redrawMap() {
 // Route cards
 // ============================================================
 function selectRoute(idx) {
-  if (navigator.vibrate) 
+  if (navigator.vibrate)
     navigator.vibrate(10);
   activeIdx = (activeIdx === idx) ? -1 : idx;
   redrawMap();
@@ -335,10 +419,6 @@ function renderCards() {
     cardsBox.appendChild(resetBtn);
   }
 
-  const countHeader = document.createElement('div');
-  countHeader.className = 'route-count';
-  countHeader.textContent = `${routes.length} route${routes.length > 1 ? 's' : ''} compared`;
-  cardsBox.appendChild(countHeader);
   // ---- "Better route" summary banner ----
   const winnerRoute = verdict.winner
     ? routes.find(r => r.name === verdict.winner)
@@ -399,6 +479,7 @@ function renderCards() {
   }
 
   cardsBox.appendChild(betterBox);
+  if (miniStats) cardsBox.appendChild(miniStats);
 
   // ---- Mini-stats row ----
   if (miniStats) {
@@ -438,7 +519,11 @@ function renderCards() {
     miniStats.hidden = false;
   }
 
-  
+  const countHeader = document.createElement('div');
+  countHeader.className = 'route-count';
+  countHeader.textContent = `${routes.length} route${routes.length > 1 ? 's' : ''} compared`;
+  cardsBox.appendChild(countHeader);
+
   const track = document.createElement('div');
   track.className = 'route-track';
   cardsBox.appendChild(track);
@@ -644,11 +729,15 @@ async function compare() {
     }
 
     currentData = data;
+    $('rsStart').textContent = start;
+    $('rsEnd').textContent = end;
+    setInputsCollapsed(true);
     document.querySelector('.samples-row').hidden = true;
     renderCards();
     renderVerdict();
     redrawMap();
   } catch (e) {
+    setInputsCollapsed(false);
     showError('Network error: ' + e.message);
   } finally {
     setLoading(false);
@@ -662,6 +751,10 @@ compareBtn.addEventListener('click', compare);
 
 $('start').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('end').focus(); });
 $('end').addEventListener('keydown', (e) => { if (e.key === 'Enter') compare(); });
+$('rsEdit').addEventListener('click', () => {
+  setInputsCollapsed(false);
+  $('start').focus();
+});
 
 // Mode buttons
 document.querySelectorAll('.mode-btn').forEach((btn) => {
@@ -680,6 +773,18 @@ if (swapBtn) {
     $('start').value = $('end').value;
     $('end').value = s;
     if (currentData) compare();
+  });
+}
+
+// Heatmap toggle
+const heatBtn = $('heatToggleBtn');
+if (heatBtn) {
+  heatBtn.addEventListener('click', () => {
+    showHeat = !showHeat;
+    heatBtn.setAttribute('aria-pressed', String(showHeat));
+    if (!heatLayer) return;
+    if (showHeat) heatLayer.addTo(map);
+    else map.removeLayer(heatLayer);
   });
 }
 
@@ -702,6 +807,7 @@ $('locateBtn').addEventListener('click', () => {
     (pos) => {
       const { longitude, latitude } = pos.coords;
       $('start').value = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+      setInputsCollapsed(false);
     },
     () => showError('Could not get your location (permission denied?).')
   );
@@ -737,8 +843,8 @@ const UNIVERSITIES = [
   { short: "UPM", name: "Universiti Putra Malaysia", lat: 3.0022, lon: 101.7064, logo: "upm.png" },
   { short: "UKM", name: "Universiti Kebangsaan Malaysia", lat: 2.9258, lon: 101.7790, logo: "ukm.png" },
   { short: "UM", name: "Universiti Malaya", lat: 3.1210, lon: 101.6550, logo: "UM.png" },
-  { short: "UiTM Shah Alam", name: "UiTM Shah Alam", lat: 3.0701, lon: 101.5026, logo: "uitm.png" },
-  { short: "UiTM Puncak Alam", name: "UiTM Puncak Alam", lat: 3.2169, lon: 101.4432, logo: "uitm.png" },
+  { short: "UiTM SA", name: "UiTM Shah Alam", lat: 3.0701, lon: 101.5026, logo: "uitm.png" },
+  { short: "UiTM PALAM", name: "UiTM Puncak Alam", lat: 3.2169, lon: 101.4432, logo: "uitm.png" },
   { short: "UPNM", name: "Universiti Pertahanan Nasional", lat: 3.0160, lon: 101.7186, logo: "upnm.png" },
   { short: "MSU", name: "Management & Science University", lat: 3.0711, lon: 101.5159, logo: "msu.png" },
   { short: "GMI", name: "German-Malaysian Institute", lat: 2.9957, lon: 101.7503, logo: "gmi.png" },
@@ -848,11 +954,15 @@ async function loadUniversityAQI() {
         ? `<img class="uni-logo" src="${logoSrc}" alt="" onerror="this.style.display='none'">`
         : `<span class="uni-icon">${r.uni.short.replace(/[^A-Z]/g, '').slice(0, 3)}</span>`;
       return `
-        <li class="uni-item" data-lat="${r.uni.lat}" data-lon="${r.uni.lon}" title="${r.uni.name}">
+        <li class="uni-item" data-lat="${r.uni.lat}" data-lon="${r.uni.lon}"
+            title="${r.uni.name} · AQI ${r.station.aqi} (${cat.label})">
           ${logoHtml}
           <span class="uni-name">${r.uni.short}</span>
           <span class="uni-aqi">${r.station.aqi}</span>
-          <span class="uni-badge ${cat.cls}">${cat.label}</span>
+          <span class="uni-badge ${cat.cls}" style="--c:${aqiColor(r.station.aqi)}">
+            <span class="ub-label">${cat.label}</span>
+            <span class="ub-num">${r.station.aqi}</span>
+          </span>
         </li>
       `;
     }).join("");
@@ -877,6 +987,24 @@ async function loadUniversityAQI() {
 // Wire refresh button
 const uniRefreshBtn = document.getElementById("uniRefreshBtn");
 if (uniRefreshBtn) uniRefreshBtn.addEventListener("click", loadUniversityAQI);
+(function initUniToggle() {
+  const panel = document.querySelector('.uni-panel');
+  const btn = $('uniToggleBtn');
+  if (!panel || !btn) return;
+
+  const set = (collapsed) => {
+    panel.classList.toggle('is-collapsed', collapsed);
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.title = collapsed ? 'Expand' : 'Collapse';
+    try { localStorage.setItem('uniCollapsed', collapsed ? '1' : '0'); } catch { }
+  };
+
+  let saved = false;
+  try { saved = localStorage.getItem('uniCollapsed') === '1'; } catch { }
+  set(saved);
+
+  btn.addEventListener('click', () => set(!panel.classList.contains('is-collapsed')));
+})();
 
 // Load on startup
 loadUniversityAQI();

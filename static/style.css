@@ -1,8 +1,32 @@
 /* ============================================================
    JerebuRoute — Flat UI, IBM Plex Mono
+
+   Contents
+   1.  Tokens
+   2.  Base / reset
+   3.  Map + brand + theme switcher + credit
+   4.  Main panel (bottom-left)
+   5.  Inputs, buttons, mode picker, sample chips
+   6.  Profile selector
+   7.  Route cards
+   8.  Better-route banner + mini-stats
+   9.  Floating messages (error / verdict / legend)
+   10. Map markers (AQI, endpoints)
+   11. Campus AQI (desktop panel + mobile strip)
+   12. Leaflet overrides + minimap
+   12b. Themes (earth default, haze, ocean, forest, slate, night)
+   13. Responsive (900 → 640 → 400)
    ============================================================ */
 
+
+/* ============================================================
+   1. Tokens
+   ============================================================ */
 :root {
+  /* Type: sans for words, mono for numbers */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
   /* Surfaces */
   --panel-bg: #fdfbf6;
   --panel-bg-2: #f3eee4;
@@ -26,16 +50,39 @@
   --red: #b04526;
   --orange: #c78a2e;
 
-  /* Radius */
+  /* Accent as RGB, for translucent glows: rgba(var(--accent-rgb), 0.14) */
+  --accent-rgb: 156, 74, 30;
+  --on-accent: #fff;
+  /* text on accent-coloured buttons */
+
+  /* Shadow colour + map backdrop */
+  --shadow-rgb: 60, 40, 20;
+  --map-bg: #d5cfc0;
+
+  /* Feedback colours (banners, verdicts, errors, tags) */
+  --ok-bg: #e8f0d9;
+  --ok-border: #b5c18a;
+  --ok-ink: #2f4015;
+  --warn-bg: #faf0d8;
+  --warn-border: #d9ba7a;
+  --warn-ink: #6b4a0e;
+  --err-bg: #fbe8e4;
+  --err-border: #e2b0a5;
+  --err-ink: #6b2a1a;
+
+  /* Radius scale
+     sm = small inner pieces · md = controls + cards · lg = panels + menus
+     xl = mobile sheet · pill = chips, tags, badges, brand */
   --r-sm: 4px;
   --r-md: 6px;
-  --r-lg: 8px;
+  --r-lg: 10px;
+  --r-xl: 14px;
   --r-pill: 999px;
 
   /* Shadow */
-  --shadow-sm: 0 1px 2px rgba(60, 40, 20, 0.08);
-  --shadow-md: 0 2px 8px rgba(60, 40, 20, 0.12);
-  --shadow-lg: 0 4px 16px rgba(60, 40, 20, 0.16);
+  --shadow-sm: 0 1px 2px rgba(var(--shadow-rgb), 0.08);
+  --shadow-md: 0 2px 8px rgba(var(--shadow-rgb), 0.12);
+  --shadow-lg: 0 4px 16px rgba(var(--shadow-rgb), 0.16);
 
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 
@@ -61,12 +108,12 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.5;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: var(--ink);
-  background: #d5cfc0;
+  background: var(--map-bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -74,6 +121,11 @@ body {
 /* ============================================================
    3. Map + brand + credit
    ============================================================ */
+/* The [hidden] attribute must win over display: flex / grid rules */
+[hidden] {
+  display: none !important;
+}
+
 #map {
   position: fixed;
   inset: 0;
@@ -91,7 +143,7 @@ body {
   z-index: 400;
   background: radial-gradient(ellipse at center,
       transparent 55%,
-      rgba(60, 40, 20, 0.06) 100%);
+      rgba(var(--shadow-rgb), 0.06) 100%);
 }
 
 .brand-pill {
@@ -112,6 +164,7 @@ body {
 }
 
 .brand-name {
+  font-family: var(--font-mono);
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -123,7 +176,92 @@ body {
   height: 10px;
   border-radius: 50%;
   background: var(--blue);
-  box-shadow: 0 0 0 4px rgba(156, 74, 30, 0.15);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.15);
+}
+
+/* ---- Theme switcher (lives inside the brand pill) ---- */
+.theme-btn,
+.theme-menu {
+  pointer-events: auto;
+}
+
+.theme-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  color: var(--ink-3);
+  background: var(--panel-bg-2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.theme-btn:hover,
+.theme-btn[aria-expanded="true"] {
+  color: var(--blue);
+  background: var(--panel-bg-3);
+  border-color: var(--blue);
+}
+
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 156px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.theme-menu[hidden] {
+  display: none;
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.theme-option:hover {
+  color: var(--ink);
+  background: var(--panel-bg-2);
+}
+
+.theme-option.active {
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--panel-bg-2);
+  border-color: var(--blue);
+}
+
+.theme-swatch {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
 }
 
 .credit-badge {
@@ -132,12 +270,12 @@ body {
   left: 50%;
   transform: translateX(-50%);
   padding: 4px 14px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.03em;
   color: var(--ink-3);
-  background: rgba(253, 251, 246, 0.85);
+  background: color-mix(in srgb, var(--panel-bg) 85%, transparent);
   border: 1px solid var(--border-soft);
-  border-radius: 100px;
+  border-radius: var(--r-pill);
   z-index: 400;
 }
 
@@ -150,7 +288,8 @@ body {
   bottom: calc(20px + var(--sa-bottom));
   left: calc(20px + var(--sa-left));
   width: 360px;
-  max-height: calc(100vh - 100px); /* leaves room for the brand pill */
+  max-height: calc(100vh - 100px);
+  /* leaves room for the brand pill */
   z-index: 500;
   padding: 12px;
   display: flex;
@@ -198,6 +337,79 @@ body {
 }
 
 
+/* ---- Collapsed route summary (replaces the two inputs after a comparison) ---- */
+.routes-panel.is-collapsed {
+  display: none;
+}
+
+.route-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  background: var(--panel-bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.route-summary-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.rs-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.rs-dot-start {
+  background: var(--blue);
+}
+
+.rs-dot-end {
+  background: var(--red);
+}
+
+.rs-place {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rs-arrow {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+
+.rs-edit {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.rs-edit:hover {
+  background: var(--panel-bg-3);
+  border-color: var(--blue);
+}
+
 /* ============================================================
    5. Inputs, buttons, mode picker, sample chips
    ============================================================ */
@@ -222,7 +434,7 @@ body {
 .input-wrap:focus-within {
   background: var(--panel-bg);
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(156, 74, 30, 0.14);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
 }
 
 .input-wrap input {
@@ -319,7 +531,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: -0.005em;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--blue);
   border: 1px solid var(--blue);
   border-radius: var(--r-md);
@@ -347,8 +559,8 @@ body {
 .spinner {
   width: 11px;
   height: 11px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--on-accent) 35%, transparent);
+  border-top-color: var(--on-accent);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -393,7 +605,7 @@ body {
 }
 
 .mode-btn.active {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--blue);
 }
 
@@ -410,8 +622,7 @@ body {
   margin-right: 4px;
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--ink-4);
 }
 
@@ -447,10 +658,9 @@ body {
 }
 
 .profile-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--ink-4);
 }
 
@@ -466,7 +676,7 @@ body {
 .profile-btn {
   padding: 6px 4px;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   text-align: center;
   color: var(--ink-3);
@@ -488,7 +698,7 @@ body {
 
 .profile-btn.active {
   font-weight: 600;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--blue);
 }
 
@@ -515,10 +725,9 @@ body {
 
 .route-count {
   padding: 4px 2px 0;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--ink-4);
 }
 
@@ -574,7 +783,7 @@ body {
 .route-card.active {
   background: var(--panel-bg);
   border-color: var(--blue);
-  box-shadow: 0 0 0 2px rgba(156, 74, 30, 0.18);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
 }
 
 .route-card.dimmed {
@@ -598,7 +807,7 @@ body {
 .card-chevron {
   grid-area: chevron;
   width: 12px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-4);
   transition: transform 0.15s var(--ease);
 }
@@ -616,25 +825,25 @@ body {
 }
 
 .summary-title .tag {
-  padding: 2px 7px;
-  font-size: 9px;
+  padding: 1px 8px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: #4a5a1e;
-  background: rgba(107, 122, 58, 0.18);
-  border-radius: 100px;
+  letter-spacing: 0;
+  color: var(--ok-ink);
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  border-radius: var(--r-pill);
 }
 
 .summary-title .tag-active {
   color: var(--blue);
-  background: rgba(156, 74, 30, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
 }
 
 .summary-meta {
+  font-family: var(--font-mono);
   grid-area: meta;
   overflow: hidden;
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -642,6 +851,7 @@ body {
 }
 
 .exposure-badge {
+  font-family: var(--font-mono);
   font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -684,6 +894,7 @@ body {
 }
 
 .card-stats b {
+  font-family: var(--font-mono);
   font-weight: 600;
   color: var(--ink);
 }
@@ -702,14 +913,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  font-size: 9px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0;
   color: var(--ink-4);
 }
 
 .poll b {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: -0.01em;
   text-transform: none;
@@ -735,18 +946,19 @@ body {
 }
 
 .exp-label {
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0;
   color: var(--ink-4);
 }
 
 .exp-pm {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
 
 .exp-val {
+  font-family: var(--font-mono);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -759,8 +971,9 @@ body {
 
 .pm-margin,
 .val-margin {
+  font-family: var(--font-mono);
   margin-left: 2px;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 400;
   color: var(--ink-4);
 }
@@ -775,20 +988,21 @@ body {
 }
 
 .card-carbon b {
+  font-family: var(--font-mono);
   font-weight: 600;
   color: var(--ink);
 }
 
 .carbon-note {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 11px;
   font-style: italic;
   color: var(--ink-4);
 }
 
 .card-hint {
   margin-top: 8px;
-  font-size: 10px;
+  font-size: 11px;
   font-style: italic;
   color: var(--ink-4);
 }
@@ -819,7 +1033,7 @@ body {
 
 .card-reasoning summary::before {
   content: "▸";
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-4);
   transition: transform 0.15s var(--ease);
 }
@@ -842,7 +1056,7 @@ body {
 .reasoning-confidence {
   margin-top: 6px;
   padding-top: 6px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-4);
   border-top: 1px dashed var(--border-soft);
 }
@@ -861,7 +1075,7 @@ body {
   flex-direction: column;
   gap: 2px;
   margin-bottom: 8px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   font-size: 12px;
   line-height: 1.4;
   border: 1px solid;
@@ -881,9 +1095,9 @@ body {
 
 /* Clear winner — green */
 .better-banner.better-clear {
-  color: #2f4015;
-  background: #e8f0d9;
-  border-color: #b5c18a;
+  color: var(--ok-ink);
+  background: var(--ok-bg);
+  border-color: var(--ok-border);
 }
 
 .better-banner.better-clear::before {
@@ -892,9 +1106,9 @@ body {
 
 /* Split winner (health vs carbon) — amber */
 .better-banner.better-split {
-  color: #6b4a0e;
-  background: #faf0d8;
-  border-color: #d9ba7a;
+  color: var(--warn-ink);
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
 }
 
 .better-banner.better-split::before {
@@ -913,7 +1127,7 @@ body {
 }
 
 .better-main {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -971,14 +1185,17 @@ body {
 }
 
 .mini-stat-label {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--ink-4);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .mini-stat-value {
+  font-family: var(--font-mono);
   overflow: hidden;
   font-size: 12px;
   font-weight: 700;
@@ -1021,9 +1238,9 @@ body {
 }
 
 .error-float {
-  color: #6b2a1a;
-  background: #fbe8e4;
-  border-color: #e2b0a5;
+  color: var(--err-ink);
+  background: var(--err-bg);
+  border-color: var(--err-border);
 }
 
 .verdict-float {
@@ -1032,15 +1249,15 @@ body {
 }
 
 .verdict-float.winner {
-  color: #2f4015;
-  background: #e8f0d9;
-  border-color: #b5c18a;
+  color: var(--ok-ink);
+  background: var(--ok-bg);
+  border-color: var(--ok-border);
 }
 
 .verdict-float.tie {
-  color: #6b4a0e;
-  background: #faf0d8;
-  border-color: #d9ba7a;
+  color: var(--warn-ink);
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
 }
 
 @keyframes verdict-slide {
@@ -1068,7 +1285,7 @@ body {
   color: var(--ink-2);
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   box-shadow: var(--shadow-md);
 }
 
@@ -1105,7 +1322,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1129,7 +1346,7 @@ body {
 .aqi-circle.aqi-small {
   width: 30px;
   height: 30px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .endpoint-dot {
@@ -1141,11 +1358,11 @@ body {
 }
 
 .endpoint-start .endpoint-dot {
-  background: #9c4a1e;
+  background: var(--blue);
 }
 
 .endpoint-end .endpoint-dot {
-  background: #b04526;
+  background: var(--red);
 }
 
 
@@ -1168,8 +1385,9 @@ body {
   overflow: hidden;
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  box-shadow: 0 4px 16px rgba(60, 40, 20, 0.14);
+  border-radius: var(--r-lg);
+  box-shadow: 0 4px 16px rgba(var(--shadow-rgb), 0.14);
+  transition: width 0.2s var(--ease);
 }
 
 .uni-header {
@@ -1181,14 +1399,14 @@ body {
 }
 
 .uni-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   color: var(--ink-4);
 }
 
-.uni-refresh {
+.uni-refresh,
+.uni-toggle {
   width: 22px;
   height: 22px;
   display: flex;
@@ -1202,7 +1420,8 @@ body {
   transition: background 0.15s var(--ease), color 0.15s var(--ease);
 }
 
-.uni-refresh:hover {
+.uni-refresh:hover,
+.uni-toggle:hover {
   color: var(--ink);
   background: var(--panel-bg-2);
 }
@@ -1252,7 +1471,7 @@ body {
   padding: 1px;
   object-fit: contain;
   background: rgba(255, 255, 255, 0.6);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
 }
 
 .uni-icon {
@@ -1262,9 +1481,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--ink-3);
   border-radius: 50%;
 }
@@ -1280,6 +1499,7 @@ body {
 }
 
 .uni-aqi {
+  font-family: var(--font-mono);
   min-width: 26px;
   font-size: 12px;
   font-weight: 700;
@@ -1290,14 +1510,13 @@ body {
 
 .uni-badge {
   display: inline-block;
-  min-width: 42px;
-  padding: 1px 6px;
-  font-size: 8px;
+  min-width: 64px;
+  padding: 1px 8px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
   text-align: center;
-  text-transform: uppercase;
-  border-radius: 100px;
+  border-radius: var(--r-pill);
 }
 
 .uni-badge.uni-good {
@@ -1338,6 +1557,55 @@ body {
   color: var(--ink-4);
 }
 
+/* ---- Collapsible (desktop): logo + short name + AQI inside a risk-coloured badge ---- */
+.uni-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.uni-toggle svg {
+  transition: transform 0.2s var(--ease);
+}
+
+.ub-num {
+  display: none;
+}
+
+.uni-panel.is-collapsed {
+  width: 200px;
+}
+
+.uni-panel.is-collapsed .uni-toggle svg {
+  transform: rotate(180deg);
+}
+
+.uni-panel.is-collapsed .uni-aqi,
+.uni-panel.is-collapsed .ub-label {
+  display: none;
+}
+
+.uni-panel.is-collapsed .ub-num {
+  display: inline;
+}
+
+.uni-panel.is-collapsed .uni-badge {
+  min-width: 38px;
+  padding: 1px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: var(--c, var(--ink-3));
+  /* set per row from the AQI level */
+}
+
+/* Yellow needs dark text to stay readable */
+.uni-panel.is-collapsed .uni-badge.uni-moderate {
+  color: #2e2416;
+}
+
 /* ---- Mobile strip (hidden on desktop, enabled in the 900px query) ---- */
 .uni-strip {
   display: none;
@@ -1346,17 +1614,18 @@ body {
 
 /* ============================================================
    12. Leaflet overrides + minimap
+   12b. Themes (earth default, haze, ocean, forest, slate, night)
    ============================================================ */
 .leaflet-control-attribution {
   margin: 0 0 calc(12px + var(--sa-bottom)) calc(12px + var(--sa-right)) !important;
   padding: 3px 12px !important;
-  font-family: "IBM Plex Mono", ui-monospace, monospace !important;
-  font-size: 9px !important;
+  font-family: var(--font-sans) !important;
+  font-size: 10px !important;
   color: var(--ink-3) !important;
-  background: rgba(253, 251, 246, 0.92) !important;
+  background: color-mix(in srgb, var(--panel-bg) 92%, transparent) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 100px !important;
-  box-shadow: 0 2px 6px rgba(60, 40, 20, 0.08) !important;
+  border-radius: var(--r-pill) !important;
+  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.08) !important;
 }
 
 .leaflet-control-attribution a {
@@ -1373,13 +1642,13 @@ body {
   overflow: hidden;
   border: 1px solid var(--border) !important;
   border-radius: var(--r-md) !important;
-  box-shadow: 0 2px 6px rgba(60, 40, 20, 0.1) !important;
+  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.1) !important;
 }
 
 .leaflet-control-zoom a {
   width: 30px !important;
   height: 30px !important;
-  font-family: "IBM Plex Mono", monospace !important;
+  font-family: var(--font-sans) !important;
   font-size: 16px !important;
   line-height: 30px !important;
   color: var(--ink-2) !important;
@@ -1396,6 +1665,31 @@ body {
   border-bottom: none !important;
 }
 
+/* Popups + tooltips follow the theme */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  border-radius: var(--r-lg);
+  color: var(--ink);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-md);
+}
+
+.leaflet-popup-content a {
+  color: var(--blue);
+}
+
+.leaflet-tooltip {
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.leaflet-tooltip::before {
+  display: none;
+}
+
 .minimap {
   position: fixed;
   bottom: calc(35px + var(--sa-bottom));
@@ -1405,12 +1699,167 @@ body {
   z-index: 600;
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   /* clip-path keeps the rounded corners without breaking Leaflet's size detection */
-  clip-path: inset(0 round var(--r-md));
-  box-shadow: 0 4px 16px rgba(60, 40, 20, 0.18);
+  clip-path: inset(0 round var(--r-lg));
+  box-shadow: 0 4px 16px rgba(var(--shadow-rgb), 0.18);
 }
 
+
+/* ============================================================
+   12b. Themes
+   Default (no data-theme) = Earth. Switch with
+   <html data-theme="haze|ocean|forest|slate|night">.
+   Selectors use :root[...] so they can't leak onto buttons.
+   ============================================================ */
+
+/* Haze — smoggy warm greys, amber accent */
+:root[data-theme="haze"] {
+  --panel-bg: #f6f4f0;
+  --panel-bg-2: #ebe8e2;
+  --panel-bg-3: #ddd9d0;
+  --border: #c9c4b8;
+  --border-soft: #e0dcd2;
+  --ink: #25282b;
+  --ink-2: #454a4f;
+  --ink-3: #6b7076;
+  --ink-4: #9a9ea3;
+  --blue: #b8641a;
+  --blue-hover: #9c5314;
+  --blue-press: #804311;
+  --green: #5b7a4a;
+  --red: #b5432b;
+  --orange: #c78a2e;
+  --accent-rgb: 184, 100, 26;
+  --shadow-rgb: 37, 40, 43;
+  --map-bg: #d4d2cc;
+}
+
+/* Ocean — clean teal on near-white */
+:root[data-theme="ocean"] {
+  --panel-bg: #fbfdfd;
+  --panel-bg-2: #eef5f5;
+  --panel-bg-3: #dce9ea;
+  --border: #c3d6d8;
+  --border-soft: #e1ecec;
+  --ink: #14282b;
+  --ink-2: #2f4a4e;
+  --ink-3: #587478;
+  --ink-4: #8aa3a6;
+  --blue: #0f766e;
+  --blue-hover: #0c5f58;
+  --blue-press: #094a45;
+  --green: #4d7c0f;
+  --red: #b91c1c;
+  --orange: #c2780a;
+  --accent-rgb: 15, 118, 110;
+  --shadow-rgb: 20, 40, 43;
+  --map-bg: #cfdcdc;
+}
+
+/* Forest — sage greens */
+:root[data-theme="forest"] {
+  --panel-bg: #fafbf7;
+  --panel-bg-2: #eff2e8;
+  --panel-bg-3: #e0e6d3;
+  --border: #c9d2b8;
+  --border-soft: #e3e8d8;
+  --ink: #1f2a1c;
+  --ink-2: #3d4c38;
+  --ink-3: #66775f;
+  --ink-4: #98a692;
+  --blue: #3b6b4a;
+  --blue-hover: #2f5739;
+  --blue-press: #25452d;
+  --green: #4d7c0f;
+  --red: #b04526;
+  --orange: #c78a2e;
+  --accent-rgb: 59, 107, 74;
+  --shadow-rgb: 31, 42, 28;
+  --map-bg: #d3d9c6;
+}
+
+/* Slate — cool neutral, indigo accent */
+:root[data-theme="slate"] {
+  --panel-bg: #fafbfc;
+  --panel-bg-2: #f0f2f5;
+  --panel-bg-3: #e2e6ec;
+  --border: #cbd2dc;
+  --border-soft: #e4e8ee;
+  --ink: #1b2230;
+  --ink-2: #3a4558;
+  --ink-3: #64708a;
+  --ink-4: #98a2b6;
+  --blue: #4451c9;
+  --blue-hover: #3841ab;
+  --blue-press: #2e3589;
+  --green: #4d7c0f;
+  --red: #c0392b;
+  --orange: #c2780a;
+  --accent-rgb: 68, 81, 201;
+  --shadow-rgb: 27, 34, 48;
+  --map-bg: #d3d8e0;
+}
+
+/* Night — blue-black surfaces, gold accent (also swaps to dark map tiles) */
+:root[data-theme="night"] {
+  color-scheme: dark;
+
+  --panel-bg: #171b24;
+  --panel-bg-2: #1f2530;
+  --panel-bg-3: #2a3140;
+  --border: #333c4e;
+  --border-soft: #262d3b;
+  --ink: #e8ebf2;
+  --ink-2: #c3c9d6;
+  --ink-3: #8f98ab;
+  --ink-4: #667086;
+  --blue: #e2b45f;
+  --blue-hover: #ecc276;
+  --blue-press: #f3cf8f;
+  --green: #8fbf7a;
+  --red: #ec7f6a;
+  --orange: #e0a64a;
+  --accent-rgb: 226, 180, 95;
+  --on-accent: #1a1710;
+  --shadow-rgb: 0, 0, 0;
+  --map-bg: #10131a;
+
+  --ok-bg: #1f2e22;
+  --ok-border: #3a5a40;
+  --ok-ink: #a8d9a0;
+  --warn-bg: #342b17;
+  --warn-border: #5e4c24;
+  --warn-ink: #ecc87a;
+  --err-bg: #381f1c;
+  --err-border: #6a3a33;
+  --err-ink: #f1a99c;
+}
+
+/* Night: campus badges need light text on dark surfaces */
+:root[data-theme="night"] .uni-panel:not(.is-collapsed) .uni-badge.uni-good {
+  color: #8fd0a0;
+}
+
+:root[data-theme="night"] .uni-panel:not(.is-collapsed) .uni-badge.uni-moderate {
+  color: #f0d060;
+}
+
+:root[data-theme="night"] .uni-panel:not(.is-collapsed) .uni-badge.uni-unhealthy {
+  color: #f4a869;
+}
+
+:root[data-theme="night"] .uni-panel:not(.is-collapsed) .uni-badge.uni-bad {
+  color: #f08a7e;
+}
+
+:root[data-theme="night"] .uni-panel:not(.is-collapsed) .uni-badge.uni-very-bad {
+  color: #d6a0dd;
+}
+
+:root[data-theme="night"] .uni-panel:not(.is-collapsed) .uni-badge.uni-hazard {
+  color: #e88aa6;
+}
 
 /* ============================================================
    13. Responsive
@@ -1463,6 +1912,7 @@ body {
   }
 
   .uni-chip b {
+    font-family: var(--font-mono);
     font-weight: 700;
     color: var(--ink);
   }
@@ -1477,7 +1927,8 @@ body {
     justify-content: center;
     overflow: hidden;
     background: #fff;
-    border: 2px solid var(--ring, var(--border)); /* ring = AQI colour */
+    border: 2px solid var(--ring, var(--border));
+    /* ring = AQI colour */
     border-radius: 50%;
   }
 
@@ -1488,11 +1939,12 @@ body {
     height: 100%;
     padding: 2px;
     object-fit: contain;
-    background: #fff; /* covers the initials once the logo loads */
+    background: #fff;
+    /* covers the initials once the logo loads */
   }
 
   .uni-chip-initials {
-    font-size: 7px;
+    font-size: 9px;
     font-weight: 700;
     color: var(--ink-3);
   }
@@ -1520,8 +1972,9 @@ body {
     max-height: 58dvh;
     padding: 8px 12px calc(12px + var(--sa-bottom));
     border-bottom: none;
-    border-radius: 14px 14px 0 0;
-    box-shadow: 0 -4px 16px rgba(60, 40, 20, 0.18); /* floats over the map */
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    box-shadow: 0 -4px 16px rgba(var(--shadow-rgb), 0.18);
+    /* floats over the map */
   }
 
   /* ---- Collapse handle ---- */
@@ -1567,13 +2020,13 @@ body {
     overflow: hidden;
   }
 
-  .panel-stack-left.panel-collapsed > *:not(.panel-toggle-btn) {
+  .panel-stack-left.panel-collapsed>*:not(.panel-toggle-btn) {
     display: none !important;
   }
 
   .panel-stack-left.panel-collapsed .panel-toggle-btn {
     height: 32px;
-    color: #fff;
+    color: var(--on-accent);
     background: var(--blue);
     border-color: var(--blue);
   }
@@ -1591,6 +2044,15 @@ body {
 
   .brand-name {
     font-size: 12px;
+  }
+
+  .theme-btn {
+    width: 24px;
+    height: 24px;
+  }
+
+  .rs-edit {
+    min-height: 36px;
   }
 
   .minimap,
@@ -1644,7 +2106,7 @@ body {
   }
 
   .mini-stat-label {
-    font-size: 8px;
+    font-size: 11px;
   }
 
   .mini-stat-value {
@@ -1697,6 +2159,11 @@ body {
   }
 
   .panel-stack-left {
+    left: calc(8px + var(--sa-left));
+    right: calc(8px + var(--sa-right));
+    bottom: calc(8px + var(--sa-bottom));
+    width: calc(100vw - 16px);
+    max-height: 50vh;
     padding: 8px;
   }
 
@@ -1727,7 +2194,6 @@ body {
 
   .mini-stats {
     gap: 6px 10px;
-    font-size: 10px;
   }
 
   .pollution-list {
