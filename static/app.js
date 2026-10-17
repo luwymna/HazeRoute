@@ -293,7 +293,15 @@ function redrawMap() {
 
   const visibleLayers = layers.filter(Boolean);
   if (visibleLayers.length) {
-    map.fitBounds(L.featureGroup(visibleLayers).getBounds().pad(0.15));
+    const isMobile = window.innerWidth <= 640;
+    const panel = document.getElementById('mainPanel');
+    const bounds = L.featureGroup(visibleLayers).getBounds();
+
+    map.fitBounds(bounds, {
+      paddingTopLeft: [30, isMobile ? 90 : 50],
+      paddingBottomRight: [30, isMobile ? panel.offsetHeight + 20 : 50],
+      animate: true,
+    });
   }
 }
 
@@ -301,6 +309,8 @@ function redrawMap() {
 // Route cards
 // ============================================================
 function selectRoute(idx) {
+  if (navigator.vibrate) 
+    navigator.vibrate(10);
   activeIdx = (activeIdx === idx) ? -1 : idx;
   redrawMap();
   renderCards();
@@ -428,6 +438,11 @@ function renderCards() {
     miniStats.hidden = false;
   }
 
+  
+  const track = document.createElement('div');
+  track.className = 'route-track';
+  cardsBox.appendChild(track);
+
   routes.forEach((r, i) => {
     const isWinner = verdict.winner === r.name;
     const isActive = activeIdx === i;
@@ -551,7 +566,7 @@ function renderCards() {
       }
     });
 
-    cardsBox.appendChild(card);
+    track.appendChild(card);
   });
 
   legend.hidden = !verdict.winner;
@@ -629,9 +644,10 @@ async function compare() {
     }
 
     currentData = data;
-    redrawMap();
-    renderVerdict();
+    document.querySelector('.samples-row').hidden = true;
     renderCards();
+    renderVerdict();
+    redrawMap();
   } catch (e) {
     showError('Network error: ' + e.message);
   } finally {
@@ -797,6 +813,32 @@ async function loadUniversityAQI() {
     // Sort by AQI descending (worst first)
     validRows.sort((a, b) => b.station.aqi - a.station.aqi);
 
+    const strip = document.getElementById('uniStrip');
+    if (strip) {
+      strip.innerHTML = validRows.map(r => {
+        const color = aqiColor(r.station.aqi);
+        const initials = r.uni.short.replace(/[^A-Z]/g, '').slice(0, 3);
+        const img = r.uni.logo
+          ? `<img src="/static/logos/${r.uni.logo}" alt="" onerror="this.style.display='none'">`
+          : '';
+        return `
+          <button class="uni-chip" data-lat="${r.uni.lat}" data-lon="${r.uni.lon}">
+            <span class="uni-chip-logo" style="--ring:${color}">
+              <span class="uni-chip-initials">${initials}</span>
+              ${img}
+            </span>
+            <span class="uni-chip-name">${r.uni.short}</span>
+            <b style="color:${color}">${r.station.aqi}</b>
+          </button>`;
+      }).join('');
+
+      strip.querySelectorAll('.uni-chip').forEach(el => {
+        el.addEventListener('click', () => {
+          map.flyTo([+el.dataset.lat, +el.dataset.lon], 14, { duration: 1.2 });
+        });
+      });
+    }
+
     list.innerHTML = validRows.map(r => {
       const cat = aqiCategory(r.station.aqi);
       const logoSrc = r.uni.logo
@@ -888,5 +930,23 @@ loadUniversityAQI();
   // Sync minimap view when theme changes (optional: swap tile style)
   document.addEventListener('theme-changed', (ev) => {
     // Hook for future dark-mode minimap tile swap
+  });
+
+  window.addEventListener('resize', () => {
+    mini.invalidateSize();
+  });
+})();
+
+// ============================================================
+// Mobile panel collapse toggle
+// ============================================================
+(function initPanelToggle() {
+  const toggle = document.getElementById('panelToggle');
+  const panel = document.getElementById('mainPanel');
+  if (!toggle || !panel) return;
+
+  toggle.addEventListener('click', () => {
+    const collapsed = panel.classList.toggle('panel-collapsed');
+    toggle.setAttribute('aria-expanded', String(!collapsed));
   });
 })();
