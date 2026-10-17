@@ -15,11 +15,11 @@ const THEMES = [
 const TILES = {
   light: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-    opts: { maxZoom: 19, attribution: 'Tiles powered by Esri' },
+    opts: { maxZoom: 19, attribution: '© Esri' },
   },
   dark: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-    opts: { maxZoom: 19, attribution: 'Tiles powered by Esri' },
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    opts: { maxZoom: 16, attribution: '© Esri' },
   },
 };
 
@@ -196,6 +196,9 @@ const miniStats = $('miniStats');
 const routesPanel = document.querySelector('.routes-panel');
 const routeSummary = $('routeSummary');
 
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let animateCountsNext = false;
+
 function setInputsCollapsed(on) {
   routesPanel.classList.toggle('is-collapsed', on);
   routeSummary.hidden = !on;
@@ -219,6 +222,7 @@ function setLoading(on) {
 }
 
 function showError(msg) {
+  setInputsCollapsed(false);          // let the user fix the inputs
   errorBox.textContent = msg;
   errorBox.hidden = false;
 }
@@ -261,6 +265,88 @@ function routeColorDim(idx) {
   if (!winner) return NEUTRAL_DIM;
   const winnerIdx = currentData.routes.findIndex(r => r.name === winner);
   return idx === winnerIdx ? DIM_WINNER : DIM_LOSER;
+}
+
+// ============================================================
+// Count-up numbers
+// ============================================================
+function countUp(el, to, decimals = 0, ms = 500) {
+  if (REDUCED || !isFinite(to)) { el.textContent = to.toFixed(decimals); return; }
+  el.textContent = (0).toFixed(decimals);          // start at 0 immediately (no flash of the final value)
+  const t0 = performance.now();
+  const tick = (now) => {
+    const p = Math.min(1, (now - t0) / ms);
+    el.textContent = (to * (1 - Math.pow(1 - p, 3))).toFixed(decimals);   // ease-out
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function runCountUps(root) {
+  root.querySelectorAll('[data-count]').forEach((el) =>
+    countUp(el, parseFloat(el.dataset.count), parseInt(el.dataset.decimals || '0', 10)));
+}
+
+// Marks a number so runCountUps() can animate it
+const numAttr = (v, d = 0) => (v != null ? ` data-count="${v}" data-decimals="${d}"` : '');
+
+// ============================================================
+// Skeleton loading
+// ============================================================
+function uniSkeleton(n = 7) {
+  return Array.from({ length: n }, () => `
+    <li class="uni-skel">
+      <span class="skeleton sk-circle"></span>
+      <span class="skeleton sk-grow"></span>
+      <span class="skeleton sk-pill"></span>
+    </li>`).join('');
+}
+
+function showRouteSkeleton() {
+  if (emptyState) emptyState.hidden = true;
+  cardsBox.innerHTML = `
+    <div class="skeleton sk-banner"></div>
+    <div class="route-track">
+      ${[0, 1].map(() => `
+        <div class="sk-card">
+          <div class="sk-lines">
+            <span class="skeleton sk-line w60"></span>
+            <span class="skeleton sk-line w40"></span>
+          </div>
+          <span class="skeleton sk-num"></span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ============================================================
+// Card hover tooltip (one shared element, so cards can't clip it)
+// ============================================================
+const tipEl = document.createElement('div');
+tipEl.className = 'tip';
+tipEl.hidden = true;
+document.body.appendChild(tipEl);
+
+function showTip(target, text) {
+  tipEl.textContent = text;
+  tipEl.hidden = false;
+  const r = target.getBoundingClientRect();
+  const w = tipEl.offsetWidth;
+  const h = tipEl.offsetHeight;
+  const left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+  const top = r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8;
+  tipEl.style.left = left + 'px';
+  tipEl.style.top = top + 'px';
+}
+
+function hideTip() { tipEl.hidden = true; }
+
+document.addEventListener('scroll', hideTip, true);   // panel scroll would leave it floating
+
+function exposureTip(r, avg) {
+  if (r.exposure == null || !avg) return null;
+  const pct = Math.round(Math.abs(avg - r.exposure) / avg * 100);
+  if (pct < 1) return 'About average exposure';
+  return `${pct}% ${r.exposure < avg ? 'lower' : 'higher'} exposure than average`;
 }
 
 // ============================================================
@@ -330,7 +416,36 @@ function drawRoute(route, idx, color, isDimmed) {
   layers[idx] = L.featureGroup(sublayers).addTo(map);
 }
 
-function redrawMap() {
+function pathsOf(group) {
+  const out = [];
+  group.eachLayer((sub) => sub.eachLayer((l) => { if (l._path) out.push(l._path); }));
+  return out;
+}
+
+function hideRoutePaths(group) {
+  pathsOf(group).forEach((p) => { p.style.visibility = 'hidden'; });
+}
+
+function playDraw(group, order) {
+  pathsOf(group).forEach((path) => {
+    const len = path.getTotalLength();
+    const delay = order * 120;
+    path.style.transition = 'none';
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = len;
+    path.style.visibility = 'visible';
+    path.getBoundingClientRect();                       // force reflow
+    path.style.transition = `stroke-dashoffset 900ms cubic-bezier(.4,0,.2,1) ${delay}ms`;
+    path.style.strokeDashoffset = 0;
+    setTimeout(() => {                                  // restore normal line
+      path.style.transition = '';
+      path.style.strokeDasharray = '';
+      path.style.strokeDashoffset = '';
+    }, 900 + delay + 50);
+  });
+}
+
+function redrawMap(animate = false) {
   clearMap();
   if (!currentData) return;
 
@@ -376,17 +491,32 @@ function redrawMap() {
   }
 
   const visibleLayers = layers.filter(Boolean);
-  if (visibleLayers.length) {
-    const isMobile = window.innerWidth <= 640;
-    const panel = document.getElementById('mainPanel');
-    const bounds = L.featureGroup(visibleLayers).getBounds();
+  if (!visibleLayers.length) return;
 
-    map.fitBounds(bounds, {
-      paddingTopLeft: [30, isMobile ? 90 : 50],
-      paddingBottomRight: [30, isMobile ? panel.offsetHeight + 20 : 50],
-      animate: true,
-    });
+  // ---- Draw animation: hide the lines now, reveal them once the map has settled ----
+  if (animate && !REDUCED) {
+    const toAnimate = visibleLayers.slice();
+    toAnimate.forEach(hideRoutePaths);
+
+    let started = false;
+    const go = () => {
+      if (started) return;
+      started = true;
+      toAnimate.forEach((g, i) => playDraw(g, i));
+    };
+    map.once('moveend', go);   // registered BEFORE fitBounds so we can't miss it
+    setTimeout(go, 800);       // safety net
   }
+
+  const isMobile = window.innerWidth <= 640;
+  const panel = document.getElementById('mainPanel');
+  const bounds = L.featureGroup(visibleLayers).getBounds();
+
+  map.fitBounds(bounds, {
+    paddingTopLeft: [30, isMobile ? 90 : 50],
+    paddingBottomRight: [30, isMobile ? panel.offsetHeight + 20 : 50],
+    animate: true,
+  });
 }
 
 // ============================================================
@@ -404,6 +534,14 @@ function renderCards() {
   if (!currentData) return;
   if (emptyState) emptyState.hidden = true;
   const { routes, verdict } = currentData;
+
+  // Count-up only on a fresh comparison, not on every re-render (expand / select)
+  const doCount = animateCountsNext;
+  animateCountsNext = false;
+
+  hideTip();
+  const exps = routes.map((x) => x.exposure).filter((v) => v != null);
+  const avgExposure = exps.length > 1 ? exps.reduce((a, b) => a + b, 0) / exps.length : null;
 
   cardsBox.innerHTML = '';
 
@@ -505,11 +643,11 @@ function renderCards() {
     miniStats.innerHTML = `
       <div class="mini-stat">
         <span class="mini-stat-label">Best for lungs</span>
-        <span class="mini-stat-value ${exposureClass}">Route ${best.name} · ${best.exposure != null ? best.exposure.toFixed(0) : '—'}</span>
+        <span class="mini-stat-value ${exposureClass}">Route ${best.name} · <span${numAttr(best.exposure, 0)}>${best.exposure != null ? best.exposure.toFixed(0) : '—'}</span></span>
       </div>
       <div class="mini-stat">
         <span class="mini-stat-label">Best for planet</span>
-        <span class="mini-stat-value">Route ${co2Best.name} · ${co2Best.co2_kg != null ? co2Best.co2_kg.toFixed(2) + ' kg' : '—'}</span>
+        <span class="mini-stat-value">Route ${co2Best.name} · ${co2Best.co2_kg != null ? `<span${numAttr(co2Best.co2_kg, 2)}>${co2Best.co2_kg.toFixed(2)}</span> kg` : '—'}</span>
       </div>
       <div class="mini-stat">
         <span class="mini-stat-label">Time spread</span>
@@ -569,7 +707,7 @@ function renderCards() {
           ${isActive ? '<span class="tag tag-active">Viewing</span>' : ''}
         </div>
         <span class="summary-meta">${fmtDuration(r.duration_s)} · ${fmtDistance(r.distance_m)} · ${co2}</span>
-        <span class="exposure-badge">${r.exposure != null ? r.exposure.toFixed(0) : '—'}</span>
+        <span class="exposure-badge"${numAttr(r.exposure, 0)}>${r.exposure != null ? r.exposure.toFixed(0) : '—'}</span>
       </div>
 
       <!-- Expandable detail (hidden by default) -->
@@ -624,6 +762,14 @@ function renderCards() {
       </div>
     `;
 
+    // ---- Hover tooltip on the route name ----
+    const titleEl = card.querySelector('.summary-title');
+    const tip = exposureTip(r, avgExposure);
+    if (tip) {
+      titleEl.addEventListener('mouseenter', () => showTip(titleEl, tip));
+      titleEl.addEventListener('mouseleave', hideTip);
+    }
+
     // ---- Click handling ----
 
     // Chevron: toggle expand / collapse only
@@ -655,6 +801,8 @@ function renderCards() {
   });
 
   legend.hidden = !verdict.winner;
+
+  if (doCount) runCountUps($('mainPanel'));
 }
 
 function renderVerdict() {
@@ -709,6 +857,7 @@ async function compare() {
   }
 
   setLoading(true);
+  showRouteSkeleton();
   try {
     const res = await fetch('/api/compare', {
       method: 'POST',
@@ -733,14 +882,18 @@ async function compare() {
     $('rsEnd').textContent = end;
     setInputsCollapsed(true);
     document.querySelector('.samples-row').hidden = true;
+    animateCountsNext = true;      // numbers count up once for this result
     renderCards();
     renderVerdict();
-    redrawMap();
+    redrawMap(true);               // true = play the route-draw animation
   } catch (e) {
-    setInputsCollapsed(false);
     showError('Network error: ' + e.message);
   } finally {
     setLoading(false);
+    if (!currentData) {            // failed: clear the skeleton, bring back the empty state
+      cardsBox.innerHTML = '';
+      if (emptyState) emptyState.hidden = false;
+    }
   }
 }
 
@@ -880,7 +1033,10 @@ async function loadUniversityAQI() {
   const list = document.getElementById("uniList");
   if (!list) return;
 
-  list.innerHTML = '<li class="uni-loading">Loading campuses…</li>';
+  // Skeleton rows (desktop list) + skeleton chips (mobile strip) while loading
+  list.innerHTML = uniSkeleton();
+  const stripEl = document.getElementById('uniStrip');
+  if (stripEl) stripEl.innerHTML = '<span class="skeleton sk-chip"></span>'.repeat(5);
 
   try {
     const res = await fetch("/api/malaysia-stations");
@@ -889,6 +1045,7 @@ async function loadUniversityAQI() {
 
     if (!Array.isArray(stations) || stations.length === 0) {
       list.innerHTML = '<li class="uni-loading">Station data unavailable</li>';
+      if (stripEl) stripEl.innerHTML = '';
       return;
     }
 
@@ -913,13 +1070,14 @@ async function loadUniversityAQI() {
 
     if (validRows.length === 0) {
       list.innerHTML = '<li class="uni-loading">No stations near campuses</li>';
+      if (stripEl) stripEl.innerHTML = '';
       return;
     }
 
     // Sort by AQI descending (worst first)
     validRows.sort((a, b) => b.station.aqi - a.station.aqi);
 
-    const strip = document.getElementById('uniStrip');
+    const strip = stripEl;
     if (strip) {
       strip.innerHTML = validRows.map(r => {
         const color = aqiColor(r.station.aqi);
@@ -981,12 +1139,15 @@ async function loadUniversityAQI() {
   } catch (e) {
     console.warn("Could not load university AQI:", e);
     list.innerHTML = '<li class="uni-loading">Could not load campus data</li>';
+    if (stripEl) stripEl.innerHTML = '';
   }
 }
 
 // Wire refresh button
 const uniRefreshBtn = document.getElementById("uniRefreshBtn");
 if (uniRefreshBtn) uniRefreshBtn.addEventListener("click", loadUniversityAQI);
+
+// Campus panel expand / collapse (desktop)
 (function initUniToggle() {
   const panel = document.querySelector('.uni-panel');
   const btn = $('uniToggleBtn');
@@ -1045,9 +1206,6 @@ loadUniversityAQI();
   // Keep the rectangle in sync and minimap centred on main map
   map.on('move zoom moveend', () => {
     viewportRect.setBounds(map.getBounds());
-    // Minimap stays 4 zoom levels behind the main map, centred on same point
-    const targetZoom = Math.max(1, map.getZoom() - 4);
-    mini.setView(map.getCenter(), targetZoom, { animate: false });
   });
 
   // Click on the minimap → jump the main map there
@@ -1078,3 +1236,12 @@ loadUniversityAQI();
     toggle.setAttribute('aria-expanded', String(!collapsed));
   });
 })();
+
+// ============================================================
+// PWA service worker
+// ============================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { });
+  });
+}

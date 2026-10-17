@@ -18,8 +18,15 @@ from exposure import (
     SENSITIVITY_FACTORS,
 )
 
+from flask import send_from_directory
+
 load_dotenv()
 app = Flask(__name__)
+@app.route("/sw.js")
+def service_worker():
+    resp = send_from_directory("static", "sw.js", mimetype="application/javascript")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 # kg CO2 per passenger-km — fuel only (transit is an average bus/rail estimate)
 CARBON_FACTORS = {
