@@ -262,8 +262,9 @@ def compare():
 def nearest_stations():
     user_lat = request.args.get("lat", type=float)
     user_lon = request.args.get("lon", type=float)
-    
-    if not user_lat or not user_lon:
+    limit = min(max(request.args.get("limit", default=3, type=int), 1), 12)
+
+    if user_lat is None or user_lon is None:
         return jsonify({"error": "Missing lat/lon parameters"}), 400
 
     # Re-use the AQICN fetch logic
@@ -308,11 +309,9 @@ def nearest_stations():
         except Exception:
             continue
 
-    # Sort by distance (closest first) and get top 3
+    # Sort by distance (closest first) and return up to `limit`
     valid_stations.sort(key=lambda x: x["dist_km"])
-    top_3 = valid_stations[:3]
-
-    return jsonify(top_3)
+    return jsonify(valid_stations[:limit])
 
 
 # ============================================================
