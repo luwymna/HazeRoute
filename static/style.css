@@ -1631,7 +1631,7 @@ body {
    12c. Skeletons, tooltip, motion preferences
    ============================================================ */
 .leaflet-control-attribution {
-  margin: 0 0 calc(12px + var(--sa-bottom)) calc(12px + var(--sa-right)) !important;
+  margin: 0 19.5px 10px 0 !important;
   padding: 3px 12px !important;
   font-family: var(--font-sans) !important;
   font-size: 10px !important;
