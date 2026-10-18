@@ -15,6 +15,7 @@
    11. Campus AQI (desktop panel + mobile strip)
    12. Leaflet overrides + minimap
    12b. Themes (earth default, haze, ocean, forest, slate, night)
+   12c. Skeletons, tooltip, motion preferences
    13. Responsive (900 → 640 → 400)
    ============================================================ */
 
@@ -279,16 +280,6 @@ body {
   z-index: 400;
 }
 
-/* Lock in the 90% zoom look */
-body {
-  zoom: 0.85;
-  /* OR use transform: scale(0.9); transform-origin: top left; */
-  height: 111.11vh;
-  /* Compensate for the scale so no white space appears at the bottom */
-  width: 111.11vw;
-  /* Compensate for the scale so no white space appears on the right */
-}
-
 
 /* ============================================================
    4. Main panel (bottom-left)
@@ -527,6 +518,18 @@ body {
   color: var(--ink);
   background: var(--panel-bg-3);
   border-color: var(--ink-4);
+}
+
+/* Heatmap toggle: filled when the heatmap is on */
+.heat-toggle-btn[aria-pressed="true"] {
+  color: var(--on-accent);
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.heat-toggle-btn[aria-pressed="true"]:hover {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
 }
 
 .btn-primary {
@@ -1621,17 +1624,11 @@ body {
   display: none;
 }
 
-button,
-.chip,
-.route-card,
-.leaflet-marker-icon {
-  cursor: url('/static/cursor.png') 12 0, pointer !important;
-  /* The '12 0' is the X/Y coordinate of where the "click" registers on the image */
-}
 
 /* ============================================================
    12. Leaflet overrides + minimap
    12b. Themes (earth default, haze, ocean, forest, slate, night)
+   12c. Skeletons, tooltip, motion preferences
    ============================================================ */
 .leaflet-control-attribution {
   margin: 0 0 calc(12px + var(--sa-bottom)) calc(12px + var(--sa-right)) !important;
@@ -1643,7 +1640,6 @@ button,
   border: 1px solid var(--border) !important;
   border-radius: var(--r-pill) !important;
   box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.08) !important;
-  margin: 0 18px 8px 0 !important;
 }
 
 .leaflet-control-attribution a {
@@ -1880,6 +1876,136 @@ button,
 }
 
 /* ============================================================
+   12c. Skeleton loading, card tooltip, motion preferences
+   ============================================================ */
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--panel-bg-3);
+  border-radius: var(--r-sm);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg,
+      transparent,
+      color-mix(in srgb, var(--panel-bg) 70%, transparent),
+      transparent);
+  animation: shimmer 1.3s var(--ease) infinite;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Route results */
+.sk-banner {
+  height: 62px;
+  border-radius: var(--r-md);
+}
+
+.sk-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 12px;
+  background: var(--panel-bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.sk-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sk-line {
+  height: 11px;
+}
+
+.sk-line.w60 {
+  width: 60%;
+}
+
+.sk-line.w40 {
+  width: 40%;
+}
+
+.sk-num {
+  width: 38px;
+  height: 22px;
+}
+
+/* Campus list */
+.uni-skel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.uni-skel:last-child {
+  border-bottom: none;
+}
+
+.sk-circle {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.sk-grow {
+  flex: 1;
+  height: 11px;
+}
+
+.sk-pill {
+  width: 56px;
+  height: 16px;
+  border-radius: var(--r-pill);
+}
+
+/* Mobile campus strip */
+.sk-chip {
+  flex: 0 0 auto;
+  width: 92px;
+  height: 34px;
+  border-radius: var(--r-pill);
+}
+
+/* Card tooltip (one shared element, positioned from JS) */
+.tip {
+  position: fixed;
+  z-index: 700;
+  max-width: 220px;
+  padding: 5px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--panel-bg);
+  background: var(--ink);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* ============================================================
    13. Responsive
    Order matters: 900 → 640 → 400 (each overrides the previous)
    ============================================================ */
@@ -1989,8 +2115,7 @@ button,
     width: 100%;
     max-height: 58dvh;
     padding: 8px 12px calc(12px + var(--sa-bottom));
-    border-bottom: none;
-    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    border: 1px solid var(--border);
     box-shadow: 0 -4px 16px rgba(var(--shadow-rgb), 0.18);
     /* floats over the map */
   }
@@ -2145,7 +2270,8 @@ button,
     display: none;
   }
 
-  .route-track .route-card {
+  .route-track .route-card,
+  .route-track .sk-card {
     flex: 0 0 85%;
     scroll-snap-align: center;
   }
@@ -2196,13 +2322,16 @@ button,
     min-width: 120px;
   }
 
+  /* Mode picker fills the row; buttons share the width evenly */
   .mode-group {
     flex: 1 1 auto;
   }
 
   .mode-btn {
-    width: 28px;
-    height: 28px;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 28px;
+    height: 32px;
   }
 
   .btn-icon {
@@ -2222,5 +2351,22 @@ button,
     width: 26px !important;
     height: 26px !important;
     line-height: 26px !important;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 800px) {
+
+  .panel-stack-left,
+  .uni-panel {
+    zoom: 0.9;
+  }
+
+  /* zoom shrinks the max-heights too, so give them the lost 10% back */
+  .panel-stack-left {
+    max-height: calc((100vh - 100px) / 0.9);
+  }
+
+  .uni-panel {
+    max-height: calc((100vh - 220px) / 0.9);
   }
 }
