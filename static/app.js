@@ -94,7 +94,7 @@ let showHeat = true;
 let showRoutes = true;
 
 // ============================================================
-// AQICN station markers
+// AQICN station markers (worldwide, loaded for the visible area)
 // ============================================================
 
 function aqiColor(aqi) {
@@ -106,45 +106,55 @@ function aqiColor(aqi) {
   return "#7e0023";                    // Hazardous
 }
 
+const stationLayer = L.layerGroup().addTo(map);
+const MARKER_MIN_ZOOM = 6;   // below this zoom, show the heatmap only
+let stationReq = 0;          // used to ignore out-of-date responses
+let stationTimer = null;
+
 async function loadStations() {
+  const myReq = ++stationReq;
+  const b = map.getBounds();
+  const qs = new URLSearchParams({
+    south: b.getSouth(),
+    west: b.getWest(),
+    north: b.getNorth(),
+    east: b.getEast(),
+  });
+
   try {
-    const res = await fetch("/api/malaysia-stations");
+    const res = await fetch(`/api/stations?${qs}`);
     const stations = await res.json();
-    if (!Array.isArray(stations)) return;
+    if (myReq !== stationReq || !Array.isArray(stations)) return;   // stale or error
 
-    stations.forEach((s) => {
+    stationLayer.clearLayers();
+    const heatPoints = [];
+    const drawMarkers = map.getZoom() >= MARKER_MIN_ZOOM;
+
+    for (const s of stations) {
       const aqi = parseInt(s.aqi, 10);
-      if (isNaN(aqi)) return;
+      if (isNaN(aqi) || s.lat == null || s.lon == null) continue;
 
-      const color = aqiColor(aqi);
+      // Normalise 0–300 AQI to 0–1 for heat intensity
+      heatPoints.push([s.lat, s.lon, Math.min(1, aqi / 300)]);
+      if (!drawMarkers) continue;
+
       const size = aqi >= 100 ? "aqi-circle" : "aqi-circle aqi-small";
-
       L.marker([s.lat, s.lon], {
         icon: L.divIcon({
           className: "aqi-marker",
-          html: `<div class="${size}" style="background:${color}">${aqi}</div>`,
+          html: `<div class="${size}" style="background:${aqiColor(aqi)}">${aqi}</div>`,
           iconSize: [38, 38],
           iconAnchor: [19, 19],
         }),
       })
-        .addTo(map)
         .bindPopup(
           `<div style="font-family:inherit;font-size:13px;line-height:1.5">
              <b>${s.station.name}</b><br>
              AQI: <b>${aqi}</b><br>
-             <a href="${s.station.url}" target="_blank" style="color:var(--blue)">View on AQICN →</a>
+             <a href="https://aqicn.org/station/@${s.uid}" target="_blank" style="color:var(--blue)">View on AQICN →</a>
            </div>`
-        );
-    });
-
-    // Build heatmap from stations
-    const heatPoints = [];
-    for (const s of stations) {
-      const aqi = parseInt(s.aqi, 10);
-      if (isNaN(aqi) || !s.lat || !s.lon) continue;
-      // Normalise 0–300 AQI to 0–1 for heat intensity
-      const intensity = Math.min(1, aqi / 300);
-      heatPoints.push([s.lat, s.lon, intensity]);
+        )
+        .addTo(stationLayer);
     }
 
     if (heatLayer) map.removeLayer(heatLayer);
@@ -168,6 +178,12 @@ async function loadStations() {
     console.warn("Could not load AQICN stations:", e);
   }
 }
+
+// Reload when the user pans or zooms (debounced so dragging doesn't spam the API)
+map.on('moveend', () => {
+  clearTimeout(stationTimer);
+  stationTimer = setTimeout(loadStations, 400);
+});
 
 // Fire after the map is created
 loadStations();

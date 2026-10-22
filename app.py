@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 import math 
 from concurrent.futures import ThreadPoolExecutor
@@ -86,6 +87,64 @@ def malaysia_stations():
 
 
 # ============================================================
+# API: AQICN stations for whatever area the map is showing
+# (worldwide: the client sends the current viewport bounds)
+# ============================================================
+_stations_cache = {}      # (south, west, north, east) -> (timestamp, data)
+STATIONS_TTL = 300        # seconds; keeps us well under AQICN's rate limit
+
+
+@app.route("/api/stations")
+def stations_in_bounds():
+    token = os.getenv("AQICN_TOKEN")
+    if not token:
+        return jsonify({"error": "AQICN token not configured"}), 500
+
+    try:
+        south = float(request.args["south"])
+        west = float(request.args["west"])
+        north = float(request.args["north"])
+        east = float(request.args["east"])
+    except (KeyError, ValueError):
+        return jsonify({"error": "south, west, north, east are required"}), 400
+
+    # Clamp to valid ranges, then round outward to 0.1 degree so slightly
+    # different pans share one cache entry.
+    south = math.floor(max(-90, min(90, south)) * 10) / 10
+    north = math.ceil(max(-90, min(90, north)) * 10) / 10
+    west = math.floor(max(-180, min(180, west)) * 10) / 10
+    east = math.ceil(max(-180, min(180, east)) * 10) / 10
+    if south >= north or west >= east:
+        return jsonify([])
+
+    key = (south, west, north, east)
+    now = time.time()
+    hit = _stations_cache.get(key)
+    if hit and now - hit[0] < STATIONS_TTL:
+        return jsonify(hit[1])
+
+    url = (
+        "https://api.waqi.info/map/bounds/"
+        f"?latlng={south},{west},{north},{east}&token={token}"
+    )
+    try:
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        d = r.json()
+        if d.get("status") != "ok":
+            return jsonify({"error": "AQICN returned an error"}), 502
+        data = d.get("data", [])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+    # Simple size cap so the cache can't grow forever
+    if len(_stations_cache) > 200:
+        _stations_cache.clear()
+    _stations_cache[key] = (now, data)
+    return jsonify(data)
+
+
+# ============================================================
 # API: geocode a single query
 # ============================================================
 @app.route("/api/geocode", methods=["POST"])
@@ -105,8 +164,6 @@ def api_geocode():
 # ============================================================
 @app.route("/api/compare", methods=["POST"])
 def compare():
-    import time
-
     data = request.json or {}
     start_q = (data.get("start") or "").strip()
     end_q = (data.get("end") or "").strip()
